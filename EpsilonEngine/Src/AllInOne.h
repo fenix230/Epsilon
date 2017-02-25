@@ -2,9 +2,130 @@
 #include <stdint.h>
 #include <string>
 #include <Windows.h>
+#include <memory>
+#include <functional>
+#include <DirectXMath.h>
 
 namespace epsilon
 {
+	using namespace DirectX;
+
+#define DEFINE_VECTOR_OPERATORS(VECTOR)\
+	inline VECTOR& operator+= (VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorAdd(v1.XMVStore(), v2.XMVStore());\
+		return v1.XMVLoad(vm);\
+	}\
+	inline VECTOR& operator-= (VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorSubtract(v1.XMVStore(), v2.XMVStore());\
+		return v1.XMVLoad(vm);\
+	}\
+	inline VECTOR& operator*= (VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorMultiply(v1.XMVStore(), v2.XMVStore());\
+		return v1.XMVLoad(vm);\
+	}\
+	inline VECTOR& operator/= (VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorDivide(v1.XMVStore(), v2.XMVStore());\
+		return v1.XMVLoad(vm);\
+	}\
+	inline VECTOR& operator*= (VECTOR& v, float s)\
+	{\
+		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
+		return v.XMVLoad(vm);\
+	}\
+	inline VECTOR& operator/= (VECTOR& v, float s)\
+	{\
+		XMVECTOR vm = XMVectorScale(v.XMVStore(), 1 / s);\
+		return v.XMVLoad(vm);\
+	}\
+	inline VECTOR operator+ (const VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorAdd(v1.XMVStore(), v2.XMVStore());\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator- (const VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorSubtract(v1.XMVStore(), v2.XMVStore());\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator* (const VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorMultiply(v1.XMVStore(), v2.XMVStore());\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator/ (const VECTOR& v1, const VECTOR& v2)\
+	{\
+		XMVECTOR vm = XMVectorDivide(v1.XMVStore(), v2.XMVStore());\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator* (const VECTOR& v, float s)\
+	{\
+		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator* (float s, const VECTOR& v)\
+	{\
+		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator/ (const VECTOR& v, float s)\
+	{\
+		XMVECTOR vm = XMVectorScale(v.XMVStore(), 1 / s);\
+		return VECTOR().XMVLoad(vm);\
+	}\
+	inline VECTOR operator+ (const VECTOR& v)\
+	{\
+		return v;\
+	}\
+	inline VECTOR operator- (const VECTOR& v)\
+	{\
+		return v * -1.0f;\
+	}
+
+	struct Vector2f : public XMFLOAT2
+	{
+		Vector2f() : XMFLOAT2(0, 0) {}
+		Vector2f(float xx, float yy) : XMFLOAT2(xx, yy) {}
+		explicit Vector2f(const float* arr) : XMFLOAT2(arr) {}
+
+		XMVECTOR XMVStore() const { return XMLoadFloat2(this); }
+		Vector2f& XMVLoad(const XMVECTOR& v) { XMStoreFloat2(this, v); return *this; }
+	};
+
+	DEFINE_VECTOR_OPERATORS(Vector2f);
+
+
+	struct Vector3f : public XMFLOAT3
+	{
+		Vector3f() : XMFLOAT3(0, 0, 0) {}
+		Vector3f(float xx, float yy, float zz) : XMFLOAT3(xx, yy, zz) {}
+		explicit Vector3f(const float* arr) : XMFLOAT3(arr) {}
+
+		XMVECTOR XMVStore() const { return XMLoadFloat3(this); }
+		Vector3f& XMVLoad(const XMVECTOR& v) { XMStoreFloat3(this, v); return *this; }
+	};
+
+	DEFINE_VECTOR_OPERATORS(Vector3f);
+
+
+	struct Vector4f : public XMFLOAT4
+	{
+		Vector4f() : XMFLOAT4(0, 0, 0, 0) {}
+		Vector4f(float xx, float yy, float zz, float ww) : XMFLOAT4(xx, yy, zz, ww) {}
+		explicit Vector4f(const float* arr) : XMFLOAT4(arr) {}
+
+		XMVECTOR XMVStore() const { return XMLoadFloat4(this); }
+		Vector4f& XMVLoad(const XMVECTOR& v) { XMStoreFloat4(this, v); return *this; }
+	};
+
+	DEFINE_VECTOR_OPERATORS(Vector4f);
+
+
+	typedef XMMATRIX Matrix;
+
 
 	class Window
 	{
@@ -23,8 +144,6 @@ namespace epsilon
 		~Window();
 
 		HWND HWnd() const;
-
-		void Run();
 
 		int32_t Left() const;
 		int32_t Top() const;
@@ -72,4 +191,34 @@ namespace epsilon
 		WNDPROC default_wnd_proc_;
 	};
 
+	
+	class RenderEngine
+	{
+	public:
+		RenderEngine();
+
+		void Create(HWND wnd, int width, int height);
+
+		void Frame();
+
+	private:
+		HWND wnd_;
+		uint32_t width_;
+		uint32_t height_;
+	};
+
+
+	class Application
+	{
+	public:
+		Application();
+
+		void Create(const std::string& name, int width, int height);
+
+		void Run();
+
+	private:
+		std::unique_ptr<RenderEngine> re_; 
+		std::unique_ptr<Window> main_wnd_;
+	};
 }

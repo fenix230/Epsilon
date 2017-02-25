@@ -308,7 +308,34 @@ namespace epsilon
 		}
 	}
 
-	void Window::Run()
+
+	RenderEngine::RenderEngine()
+	{
+	}
+
+	void RenderEngine::Create(HWND wnd, int width, int height)
+	{
+	}
+
+	void RenderEngine::Frame()
+	{
+	}
+
+
+	Application::Application()
+	{
+
+	}
+
+	void Application::Create(const std::string& name, int width, int height)
+	{
+		main_wnd_ = std::make_unique<Window>(name, width, height);
+
+		re_ = std::make_unique<RenderEngine>();
+		re_->Create(main_wnd_->HWnd(), width, height);
+	}
+
+	void Application::Run()
 	{
 		bool gotMsg;
 		MSG  msg;
@@ -319,7 +346,7 @@ namespace epsilon
 		{
 			// 如果窗口是激活的，用 PeekMessage()以便我们可以用空闲时间渲染场景
 			// 不然, 用 GetMessage() 减少 CPU 占用率
-			if (this->Active())
+			if (main_wnd_ && main_wnd_->Active())
 			{
 				gotMsg = (::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) != 0);
 			}
@@ -335,7 +362,10 @@ namespace epsilon
 			}
 			else
 			{
-				//re.Refresh();
+				if (re_)
+				{
+					re_->Frame();
+				}
 			}
 		}
 	}

@@ -7,8 +7,12 @@
 
 int main()
 {
-	epsilon::Window win("Test", 700, 300);
-	win.Run();
+	epsilon::Matrix mat;
+	mat = mat * mat * mat;
+
+	epsilon::Application app;
+	app.Create("Test", 1024, 768);
+	app.Run();
 
     return 0;
 }
