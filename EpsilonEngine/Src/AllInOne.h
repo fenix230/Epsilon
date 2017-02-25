@@ -123,9 +123,48 @@ namespace epsilon
 
 	DEFINE_VECTOR_OPERATORS(Vector4f);
 
+	struct Matrix : public XMMATRIX
+	{
+		Matrix() 
+		{
+			*(XMMATRIX*)this = XMMatrixIdentity();
+		}
+		Matrix(float m00, float m01, float m02, float m03,
+			float m10, float m11, float m12, float m13,
+			float m20, float m21, float m22, float m23,
+			float m30, float m31, float m32, float m33) : XMMATRIX(
+				m00, m01, m02, m03, m10, m11, m12, m13,
+				m20, m21, m22, m23, m30, m31, m32, m33) {}
+		explicit Matrix(const float *arr) : XMMATRIX(arr) {}
 
-	typedef XMMATRIX Matrix;
+		Matrix& operator= (const XMMATRIX& m) { *(XMMATRIX*)this = m; return *this; }
+	};
 
+
+	inline Vector4f Transform(const Vector4f& v, const Matrix& mat)
+	{
+		return Vector4f().XMVLoad(XMVector4Transform(v.XMVStore(), mat));
+	}
+
+	inline Vector3f TransformCoord(const Vector3f& v, const Matrix& mat)
+	{
+		return Vector3f().XMVLoad(XMVector3TransformCoord(v.XMVStore(), mat));
+	}
+
+	inline Vector3f TransformNormal(const Vector3f& v, const Matrix& mat)
+	{
+		return Vector3f().XMVLoad(XMVector3TransformNormal(v.XMVStore(), mat));
+	}
+
+	inline Vector2f TransformCoord(const Vector2f& v, const Matrix& mat)
+	{
+		return Vector2f().XMVLoad(XMVector2TransformCoord(v.XMVStore(), mat));
+	}
+
+	inline Vector2f TransformNormal(const Vector2f& v, const Matrix& mat)
+	{
+		return Vector2f().XMVLoad(XMVector2TransformNormal(v.XMVStore(), mat));
+	}
 
 	class Window
 	{
