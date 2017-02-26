@@ -5,6 +5,8 @@
 #include <memory>
 #include <functional>
 #include <DirectXMath.h>
+#include <dxgi1_4.h>
+#include <d3d11_3.h>
 
 namespace epsilon
 {
@@ -166,6 +168,7 @@ namespace epsilon
 		return Vector2f().XMVLoad(XMVector2TransformNormal(v.XMVStore(), mat));
 	}
 
+
 	class Window
 	{
 	public:
@@ -231,6 +234,70 @@ namespace epsilon
 	};
 
 	
+	typedef std::shared_ptr<IDXGIFactory1>				IDXGIFactory1Ptr;
+	typedef std::shared_ptr<IDXGIFactory2>				IDXGIFactory2Ptr;
+	typedef std::shared_ptr<IDXGIFactory3>				IDXGIFactory3Ptr;
+	typedef std::shared_ptr<IDXGIFactory4>				IDXGIFactory4Ptr;
+	typedef std::shared_ptr<IDXGIAdapter1>				IDXGIAdapter1Ptr;
+	typedef std::shared_ptr<IDXGIAdapter2>				IDXGIAdapter2Ptr;
+	typedef std::shared_ptr<IDXGISwapChain>				IDXGISwapChainPtr;
+	typedef std::shared_ptr<IDXGISwapChain1>			IDXGISwapChain1Ptr;
+	typedef std::shared_ptr<IDXGISwapChain2>			IDXGISwapChain2Ptr;
+	typedef std::shared_ptr<IDXGISwapChain3>			IDXGISwapChain3Ptr;
+	typedef std::shared_ptr<ID3D11Device>				ID3D11DevicePtr;
+	typedef std::shared_ptr<ID3D11Device1>				ID3D11Device1Ptr;
+	typedef std::shared_ptr<ID3D11Device2>				ID3D11Device2Ptr;
+	typedef std::shared_ptr<ID3D11Device3>				ID3D11Device3Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext>		ID3D11DeviceContextPtr;
+	typedef std::shared_ptr<ID3D11DeviceContext1>		ID3D11DeviceContext1Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext2>		ID3D11DeviceContext2Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext3>		ID3D11DeviceContext3Ptr;
+	typedef std::shared_ptr<ID3D11Resource>				ID3D11ResourcePtr;
+	typedef std::shared_ptr<ID3D11Texture1D>			ID3D11Texture1DPtr;
+	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11Texture2DPtr;
+	typedef std::shared_ptr<ID3D11Texture3D>			ID3D11Texture3DPtr;
+	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11TextureCubePtr;
+	typedef std::shared_ptr<ID3D11Buffer>				ID3D11BufferPtr;
+	typedef std::shared_ptr<ID3D11InputLayout>			ID3D11InputLayoutPtr;
+	typedef std::shared_ptr<ID3D11Query>				ID3D11QueryPtr;
+	typedef std::shared_ptr<ID3D11Predicate>			ID3D11PredicatePtr;
+	typedef std::shared_ptr<ID3D11VertexShader>			ID3D11VertexShaderPtr;
+	typedef std::shared_ptr<ID3D11PixelShader>			ID3D11PixelShaderPtr;
+	typedef std::shared_ptr<ID3D11GeometryShader>		ID3D11GeometryShaderPtr;
+	typedef std::shared_ptr<ID3D11ComputeShader>		ID3D11ComputeShaderPtr;
+	typedef std::shared_ptr<ID3D11HullShader>			ID3D11HullShaderPtr;
+	typedef std::shared_ptr<ID3D11DomainShader>			ID3D11DomainShaderPtr;
+	typedef std::shared_ptr<ID3D11RenderTargetView>		ID3D11RenderTargetViewPtr;
+	typedef std::shared_ptr<ID3D11DepthStencilView>		ID3D11DepthStencilViewPtr;
+	typedef std::shared_ptr<ID3D11UnorderedAccessView>	ID3D11UnorderedAccessViewPtr;
+	typedef std::shared_ptr<ID3D11RasterizerState>		ID3D11RasterizerStatePtr;
+	typedef std::shared_ptr<ID3D11RasterizerState1>		ID3D11RasterizerState1Ptr;
+	typedef std::shared_ptr<ID3D11DepthStencilState>	ID3D11DepthStencilStatePtr;
+	typedef std::shared_ptr<ID3D11BlendState>			ID3D11BlendStatePtr;
+	typedef std::shared_ptr<ID3D11BlendState1>			ID3D11BlendState1Ptr;
+	typedef std::shared_ptr<ID3D11SamplerState>			ID3D11SamplerStatePtr;
+	typedef std::shared_ptr<ID3D11ShaderResourceView>	ID3D11ShaderResourceViewPtr;
+
+
+	inline std::string CombineFileLine(std::string const & file, int line)
+	{
+		char str[256];
+		sprintf_s(str, "%s: %d", file.c_str(), line);
+		return std::string(str);
+	}
+	
+#define THR(x)	{ throw std::system_error(std::make_error_code(x), CombineFileLine(__FILE__, __LINE__)); }
+
+// Throw if failed
+#define TIF(x)	{ HRESULT _hr = x; if (static_cast<HRESULT>(_hr) < 0) { throw std::runtime_error(CombineFileLine(__FILE__, __LINE__)); } }
+
+	template <typename T>
+	inline std::shared_ptr<T> MakeCOMPtr(T* p)
+	{
+		return p ? std::shared_ptr<T>(p, std::mem_fn(&T::Release)) : std::shared_ptr<T>();
+	}
+
+
 	class RenderEngine
 	{
 	public:
@@ -244,6 +311,24 @@ namespace epsilon
 		HWND wnd_;
 		uint32_t width_;
 		uint32_t height_;
+
+		typedef HRESULT(WINAPI *CreateDXGIFactory1Func)(REFIID riid, void** ppFactory);
+		typedef HRESULT(WINAPI *D3D11CreateDeviceFunc)(IDXGIAdapter* pAdapter,
+			D3D_DRIVER_TYPE DriverType, HMODULE Software, UINT Flags,
+			D3D_FEATURE_LEVEL const * pFeatureLevels, UINT FeatureLevels, UINT SDKVersion,
+			ID3D11Device** ppDevice, D3D_FEATURE_LEVEL* pFeatureLevel, ID3D11DeviceContext** ppImmediateContext);
+
+		CreateDXGIFactory1Func DynamicCreateDXGIFactory1_;
+		D3D11CreateDeviceFunc DynamicD3D11CreateDevice_;
+
+		HMODULE mod_d3d11_;
+		HMODULE mod_dxgi_;
+
+		IDXGIFactory1Ptr gi_factory_1_;
+		IDXGIFactory2Ptr gi_factory_2_;
+		IDXGIFactory3Ptr gi_factory_3_;
+		IDXGIFactory4Ptr gi_factory_4_;
+		uint8_t dxgi_sub_ver_;
 	};
 
 

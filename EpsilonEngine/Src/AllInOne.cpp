@@ -311,6 +311,73 @@ namespace epsilon
 
 	RenderEngine::RenderEngine()
 	{
+		mod_dxgi_ = ::LoadLibraryEx(TEXT("dxgi.dll"), nullptr, 0);
+		if (nullptr == mod_dxgi_)
+		{
+			::MessageBoxW(nullptr, L"Can't load dxgi.dll", L"Error", MB_OK);
+		}
+		mod_d3d11_ = ::LoadLibraryEx(TEXT("d3d11.dll"), nullptr, 0);
+		if (nullptr == mod_d3d11_)
+		{
+			::MessageBoxW(nullptr, L"Can't load d3d11.dll", L"Error", MB_OK);
+		}
+
+		if (mod_dxgi_ != nullptr)
+		{
+			DynamicCreateDXGIFactory1_ = reinterpret_cast<CreateDXGIFactory1Func>(::GetProcAddress(mod_dxgi_, "CreateDXGIFactory1"));
+		}
+		if (mod_d3d11_ != nullptr)
+		{
+			DynamicD3D11CreateDevice_ = reinterpret_cast<D3D11CreateDeviceFunc>(::GetProcAddress(mod_d3d11_, "D3D11CreateDevice"));
+		}
+
+		IDXGIFactory1* gi_factory;
+		TIF(DynamicCreateDXGIFactory1_(IID_IDXGIFactory1, reinterpret_cast<void**>(&gi_factory)));
+		gi_factory_1_ = MakeCOMPtr(gi_factory);
+		dxgi_sub_ver_ = 1;
+
+		IDXGIFactory2* gi_factory2;
+		gi_factory->QueryInterface(IID_IDXGIFactory2, reinterpret_cast<void**>(&gi_factory2));
+		if (gi_factory2 != nullptr)
+		{
+			gi_factory_2_ = MakeCOMPtr(gi_factory2);
+			dxgi_sub_ver_ = 2;
+
+			IDXGIFactory3* gi_factory3;
+			gi_factory->QueryInterface(IID_IDXGIFactory3, reinterpret_cast<void**>(&gi_factory3));
+			if (gi_factory3 != nullptr)
+			{
+				gi_factory_3_ = MakeCOMPtr(gi_factory3);
+				dxgi_sub_ver_ = 3;
+
+				IDXGIFactory4* gi_factory4;
+				gi_factory->QueryInterface(IID_IDXGIFactory4, reinterpret_cast<void**>(&gi_factory4));
+				if (gi_factory4 != nullptr)
+				{
+					gi_factory_4_ = MakeCOMPtr(gi_factory4);
+					dxgi_sub_ver_ = 4;
+				}
+			}
+		}
+
+		UINT adapter_no = 0;
+		IDXGIAdapter1* dxgi_adapter = nullptr;
+		while (gi_factory_1_->EnumAdapters1(adapter_no, &dxgi_adapter) != DXGI_ERROR_NOT_FOUND)
+		{
+			if (dxgi_adapter != nullptr)
+			{
+				auto adapter = MakeUniquePtr<D3D11Adapter>(adapter_no, MakeCOMPtr(dxgi_adapter));
+				adapter->Enumerate();
+				adapters_.push_back(std::move(adapter));
+			}
+
+			++adapter_no;
+		}
+
+		if (adapters_.empty())
+		{
+			THR(errc::function_not_supported);
+		}
 	}
 
 	void RenderEngine::Create(HWND wnd, int width, int height)
