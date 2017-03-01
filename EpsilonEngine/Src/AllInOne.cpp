@@ -529,12 +529,12 @@ namespace epsilon
 	
 	void StaticMesh::Destory()
 	{
+		d3d_input_layouts_.clear();
 		d3d_position_buffer_.reset();
 		d3d_normal_buffer_.reset();
 		d3d_diffuse_buffer_.reset();
 		d3d_specular_buffer_.reset();
 		d3d_index_buffer_.reset();
-		d3d_input_layouts_.clear();
 	}
 
 	void StaticMesh::Bind()
@@ -941,6 +941,10 @@ namespace epsilon
 
 	void RenderEngine::Destory()
 	{
+		rs_.clear();
+		cb_.reset();
+		so_.reset();
+
 		if (gi_swap_chain_1_)
 		{
 			gi_swap_chain_1_->SetFullscreenState(false, nullptr);
@@ -953,7 +957,11 @@ namespace epsilon
 		d3d_render_target_view_.reset();
 		d3d_imm_ctx_.reset();
 		d3d_device_.reset();
+
 		gi_swap_chain_1_.reset();
+		gi_adapter_.reset();
+		gi_factory_1_.reset();
+		gi_factory_2_.reset();
 
 		::FreeLibrary(mod_d3dcompiler_);
 		::FreeLibrary(mod_d3d11_);

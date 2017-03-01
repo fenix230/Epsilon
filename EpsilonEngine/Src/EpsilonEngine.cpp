@@ -87,8 +87,9 @@ int main()
 		CBufferObjectPtr cb = std::make_shared<CBufferObject>();
 		cb->SetRE(re);
 		cb->Create();
-		cb->camera_.LookAt(Vector3f(0, 0, 5), Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-		cb->camera_.Perspective(XM_PIDIV4, (float)width / (float)height, 0.1f, 300);
+		Vector3f eye(0, -3 - 3.5f, 2.0f), at(0, 0, 0), up(0, 0, 1);
+		cb->camera_.LookAt(eye, at, up);
+		cb->camera_.Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
 		re.SetCBufferObject(cb);
 
 		ShaderObjectPtr so = std::make_shared<ShaderObject>();
@@ -103,6 +104,11 @@ int main()
 		re.AddRenderable(r);
 
 		app.Run();
+
+		cb.reset();
+		so.reset();
+		r.reset();
+
 		app.Destory();
 	}
 	catch (const std::exception& e)
