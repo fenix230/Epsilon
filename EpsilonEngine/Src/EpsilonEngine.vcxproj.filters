@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\Shaders">
+      <UniqueIdentifier>{ae489c1e-869d-4a96-9c2d-6b0bfbe2ff61}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -38,5 +41,13 @@
     <ClCompile Include="AllInOne.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\Media\Shader\VertexShader.hlsl">
+      <Filter>头文件\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Media\Shader\PixelShader.hlsl">
+      <Filter>头文件\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

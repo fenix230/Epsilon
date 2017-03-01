@@ -6,7 +6,13 @@
 #include <functional>
 #include <DirectXMath.h>
 #include <dxgi1_4.h>
+#include <d3d11.h>
+#include <d3d11_1.h>
+#include <d3d11_2.h>
 #include <d3d11_3.h>
+#include <vector>
+#include <d3dcompiler.h>
+
 
 namespace epsilon
 {
@@ -112,6 +118,13 @@ namespace epsilon
 
 	DEFINE_VECTOR_OPERATORS(Vector3f);
 
+	inline Vector3f CrossProduct3(const Vector3f& v1, const Vector3f& v2)
+	{
+		Vector3f rv;
+		rv.XMVLoad(XMVector3Cross(v1.XMVStore(), v2.XMVStore()));
+		return rv;
+	}
+
 
 	struct Vector4f : public XMFLOAT4
 	{
@@ -167,6 +180,52 @@ namespace epsilon
 	{
 		return Vector2f().XMVLoad(XMVector2TransformNormal(v.XMVStore(), mat));
 	}
+
+
+	typedef std::shared_ptr<IDXGIFactory1>				IDXGIFactory1Ptr;
+	typedef std::shared_ptr<IDXGIFactory2>				IDXGIFactory2Ptr;
+	typedef std::shared_ptr<IDXGIFactory3>				IDXGIFactory3Ptr;
+	typedef std::shared_ptr<IDXGIFactory4>				IDXGIFactory4Ptr;
+	typedef std::shared_ptr<IDXGIAdapter>				IDXGIAdapterPtr;
+	typedef std::shared_ptr<IDXGIAdapter1>				IDXGIAdapter1Ptr;
+	typedef std::shared_ptr<IDXGIAdapter2>				IDXGIAdapter2Ptr;
+	typedef std::shared_ptr<IDXGISwapChain>				IDXGISwapChainPtr;
+	typedef std::shared_ptr<IDXGISwapChain1>			IDXGISwapChain1Ptr;
+	typedef std::shared_ptr<IDXGISwapChain2>			IDXGISwapChain2Ptr;
+	typedef std::shared_ptr<IDXGISwapChain3>			IDXGISwapChain3Ptr;
+	typedef std::shared_ptr<ID3D11Device>				ID3D11DevicePtr;
+	typedef std::shared_ptr<ID3D11Device1>				ID3D11Device1Ptr;
+	typedef std::shared_ptr<ID3D11Device2>				ID3D11Device2Ptr;
+	typedef std::shared_ptr<ID3D11Device3>				ID3D11Device3Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext>		ID3D11DeviceContextPtr;
+	typedef std::shared_ptr<ID3D11DeviceContext1>		ID3D11DeviceContext1Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext2>		ID3D11DeviceContext2Ptr;
+	typedef std::shared_ptr<ID3D11DeviceContext3>		ID3D11DeviceContext3Ptr;
+	typedef std::shared_ptr<ID3D11Resource>				ID3D11ResourcePtr;
+	typedef std::shared_ptr<ID3D11Texture1D>			ID3D11Texture1DPtr;
+	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11Texture2DPtr;
+	typedef std::shared_ptr<ID3D11Texture3D>			ID3D11Texture3DPtr;
+	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11TextureCubePtr;
+	typedef std::shared_ptr<ID3D11Buffer>				ID3D11BufferPtr;
+	typedef std::shared_ptr<ID3D11InputLayout>			ID3D11InputLayoutPtr;
+	typedef std::shared_ptr<ID3D11Query>				ID3D11QueryPtr;
+	typedef std::shared_ptr<ID3D11Predicate>			ID3D11PredicatePtr;
+	typedef std::shared_ptr<ID3D11VertexShader>			ID3D11VertexShaderPtr;
+	typedef std::shared_ptr<ID3D11PixelShader>			ID3D11PixelShaderPtr;
+	typedef std::shared_ptr<ID3D11GeometryShader>		ID3D11GeometryShaderPtr;
+	typedef std::shared_ptr<ID3D11ComputeShader>		ID3D11ComputeShaderPtr;
+	typedef std::shared_ptr<ID3D11HullShader>			ID3D11HullShaderPtr;
+	typedef std::shared_ptr<ID3D11DomainShader>			ID3D11DomainShaderPtr;
+	typedef std::shared_ptr<ID3D11RenderTargetView>		ID3D11RenderTargetViewPtr;
+	typedef std::shared_ptr<ID3D11DepthStencilView>		ID3D11DepthStencilViewPtr;
+	typedef std::shared_ptr<ID3D11UnorderedAccessView>	ID3D11UnorderedAccessViewPtr;
+	typedef std::shared_ptr<ID3D11RasterizerState>		ID3D11RasterizerStatePtr;
+	typedef std::shared_ptr<ID3D11RasterizerState1>		ID3D11RasterizerState1Ptr;
+	typedef std::shared_ptr<ID3D11DepthStencilState>	ID3D11DepthStencilStatePtr;
+	typedef std::shared_ptr<ID3D11BlendState>			ID3D11BlendStatePtr;
+	typedef std::shared_ptr<ID3D11BlendState1>			ID3D11BlendState1Ptr;
+	typedef std::shared_ptr<ID3D11SamplerState>			ID3D11SamplerStatePtr;
+	typedef std::shared_ptr<ID3D11ShaderResourceView>	ID3D11ShaderResourceViewPtr;
 
 
 	class Window
@@ -233,79 +292,153 @@ namespace epsilon
 		WNDPROC default_wnd_proc_;
 	};
 
-	
-	typedef std::shared_ptr<IDXGIFactory1>				IDXGIFactory1Ptr;
-	typedef std::shared_ptr<IDXGIFactory2>				IDXGIFactory2Ptr;
-	typedef std::shared_ptr<IDXGIFactory3>				IDXGIFactory3Ptr;
-	typedef std::shared_ptr<IDXGIFactory4>				IDXGIFactory4Ptr;
-	typedef std::shared_ptr<IDXGIAdapter1>				IDXGIAdapter1Ptr;
-	typedef std::shared_ptr<IDXGIAdapter2>				IDXGIAdapter2Ptr;
-	typedef std::shared_ptr<IDXGISwapChain>				IDXGISwapChainPtr;
-	typedef std::shared_ptr<IDXGISwapChain1>			IDXGISwapChain1Ptr;
-	typedef std::shared_ptr<IDXGISwapChain2>			IDXGISwapChain2Ptr;
-	typedef std::shared_ptr<IDXGISwapChain3>			IDXGISwapChain3Ptr;
-	typedef std::shared_ptr<ID3D11Device>				ID3D11DevicePtr;
-	typedef std::shared_ptr<ID3D11Device1>				ID3D11Device1Ptr;
-	typedef std::shared_ptr<ID3D11Device2>				ID3D11Device2Ptr;
-	typedef std::shared_ptr<ID3D11Device3>				ID3D11Device3Ptr;
-	typedef std::shared_ptr<ID3D11DeviceContext>		ID3D11DeviceContextPtr;
-	typedef std::shared_ptr<ID3D11DeviceContext1>		ID3D11DeviceContext1Ptr;
-	typedef std::shared_ptr<ID3D11DeviceContext2>		ID3D11DeviceContext2Ptr;
-	typedef std::shared_ptr<ID3D11DeviceContext3>		ID3D11DeviceContext3Ptr;
-	typedef std::shared_ptr<ID3D11Resource>				ID3D11ResourcePtr;
-	typedef std::shared_ptr<ID3D11Texture1D>			ID3D11Texture1DPtr;
-	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11Texture2DPtr;
-	typedef std::shared_ptr<ID3D11Texture3D>			ID3D11Texture3DPtr;
-	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11TextureCubePtr;
-	typedef std::shared_ptr<ID3D11Buffer>				ID3D11BufferPtr;
-	typedef std::shared_ptr<ID3D11InputLayout>			ID3D11InputLayoutPtr;
-	typedef std::shared_ptr<ID3D11Query>				ID3D11QueryPtr;
-	typedef std::shared_ptr<ID3D11Predicate>			ID3D11PredicatePtr;
-	typedef std::shared_ptr<ID3D11VertexShader>			ID3D11VertexShaderPtr;
-	typedef std::shared_ptr<ID3D11PixelShader>			ID3D11PixelShaderPtr;
-	typedef std::shared_ptr<ID3D11GeometryShader>		ID3D11GeometryShaderPtr;
-	typedef std::shared_ptr<ID3D11ComputeShader>		ID3D11ComputeShaderPtr;
-	typedef std::shared_ptr<ID3D11HullShader>			ID3D11HullShaderPtr;
-	typedef std::shared_ptr<ID3D11DomainShader>			ID3D11DomainShaderPtr;
-	typedef std::shared_ptr<ID3D11RenderTargetView>		ID3D11RenderTargetViewPtr;
-	typedef std::shared_ptr<ID3D11DepthStencilView>		ID3D11DepthStencilViewPtr;
-	typedef std::shared_ptr<ID3D11UnorderedAccessView>	ID3D11UnorderedAccessViewPtr;
-	typedef std::shared_ptr<ID3D11RasterizerState>		ID3D11RasterizerStatePtr;
-	typedef std::shared_ptr<ID3D11RasterizerState1>		ID3D11RasterizerState1Ptr;
-	typedef std::shared_ptr<ID3D11DepthStencilState>	ID3D11DepthStencilStatePtr;
-	typedef std::shared_ptr<ID3D11BlendState>			ID3D11BlendStatePtr;
-	typedef std::shared_ptr<ID3D11BlendState1>			ID3D11BlendState1Ptr;
-	typedef std::shared_ptr<ID3D11SamplerState>			ID3D11SamplerStatePtr;
-	typedef std::shared_ptr<ID3D11ShaderResourceView>	ID3D11ShaderResourceViewPtr;
+
+#define DEFINE_SMART_POINTER(X)\
+	class X;\
+	typedef std::shared_ptr<X> X##Ptr;
+
+#define INTERFACE_SET_RE\
+	inline void SetRE(RenderEngine& re) { re_ = &re; }\
+	RenderEngine* re_;
+
+	class RenderEngine;
+	DEFINE_SMART_POINTER(CBufferObject);
+	DEFINE_SMART_POINTER(ShaderObject);
+	DEFINE_SMART_POINTER(Renderable);
+	DEFINE_SMART_POINTER(StaticMesh);
 
 
-	inline std::string CombineFileLine(std::string const & file, int line)
+	struct Camera
 	{
-		char str[256];
-		sprintf_s(str, "%s: %d", file.c_str(), line);
-		return std::string(str);
-	}
-	
-#define THR(x)	{ throw std::system_error(std::make_error_code(x), CombineFileLine(__FILE__, __LINE__)); }
+		void LookAt(Vector3f pos, Vector3f target, Vector3f up);
 
-// Throw if failed
-#define TIF(x)	{ HRESULT _hr = x; if (static_cast<HRESULT>(_hr) < 0) { throw std::runtime_error(CombineFileLine(__FILE__, __LINE__)); } }
+		void Perspective(float ang, float aspect, float near_plane, float far_plane);
 
-	template <typename T>
-	inline std::shared_ptr<T> MakeCOMPtr(T* p)
+		Matrix world;
+		Matrix view;
+		Matrix proj;
+	};
+
+
+	class CBufferObject
 	{
-		return p ? std::shared_ptr<T>(p, std::mem_fn(&T::Release)) : std::shared_ptr<T>();
-	}
+	public:
+		CBufferObject();
+		~CBufferObject();
+
+		INTERFACE_SET_RE;
+
+		void Create();
+		void Destory();
+
+		void BindVS();
+		void BindPS();
+		
+		Camera camera_;
+
+	private:
+		ID3D11BufferPtr d3d_cbuffer_;
+	};
+
+
+	class ShaderObject
+	{
+	public:
+		ShaderObject();
+		~ShaderObject();
+
+		INTERFACE_SET_RE;
+
+		void CreateVS(std::string file_path, std::string entry_point);
+		void CreatePS(std::string file_path, std::string entry_point);
+		void Destory();
+
+		const std::vector<uint8_t>& VSCode();
+
+		void Bind();
+
+	private:
+		ID3D11VertexShaderPtr d3d_vs_;
+		ID3D11PixelShaderPtr d3d_ps_;
+		std::vector<uint8_t> vs_code_;
+	};
+
+
+	class Renderable
+	{
+	public:
+		INTERFACE_SET_RE;
+
+		virtual void Bind() = 0;
+		virtual void Render(ShaderObject* so) = 0;
+	};
+
+
+	class StaticMesh : public Renderable
+	{
+	public:
+		StaticMesh();
+		~StaticMesh();
+
+		virtual void Bind() override;
+		virtual void Render(ShaderObject* so) override;
+
+		void CreatePositionBuffer(const std::vector<Vector3f>& positions);
+		void CreateNormalBuffer(const std::vector<Vector3f>& normals);
+		void CreateDiffuseBuffer(const std::vector<Vector3f>& diffuses);
+		void CreateSpecularBuffer(const std::vector<Vector3f>& speculars);
+		void CreateIndexBuffer(const std::vector<uint32_t>& indices);
+
+		void Destory();
+
+	private:
+		void PositionElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
+		void NormalElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
+		void DiffuseElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
+		void SpecularElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
+
+		ID3D11InputLayout* D3DInputLayout(ShaderObject* so);
+
+	private:
+		ID3D11BufferPtr d3d_position_buffer_;
+		ID3D11BufferPtr d3d_normal_buffer_;
+		ID3D11BufferPtr d3d_diffuse_buffer_;
+		ID3D11BufferPtr d3d_specular_buffer_;
+		ID3D11BufferPtr d3d_index_buffer_;
+
+		UINT num_position_;
+		UINT num_normal_;
+		UINT num_diffuse_;
+		UINT num_specular_;
+		UINT num_indice_;
+
+		std::vector<std::pair<ShaderObject*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
+	};
 
 
 	class RenderEngine
 	{
 	public:
 		RenderEngine();
+		~RenderEngine();
 
 		void Create(HWND wnd, int width, int height);
+		void Destory();
+
+		void SetShaderObject(ShaderObjectPtr so);
+
+		void SetCBufferObject(CBufferObjectPtr cb);
+
+		void AddRenderable(RenderablePtr r);
 
 		void Frame();
+
+		ID3D11Device* D3DDevice();
+
+		ID3D11DeviceContext* D3DContext();
+
+		HRESULT D3DCompile(std::string const & src_data, const char* entry_point, const char* target,
+			std::vector<uint8_t>& code, std::string& error_msgs) const;
 
 	private:
 		HWND wnd_;
@@ -320,15 +453,29 @@ namespace epsilon
 
 		CreateDXGIFactory1Func DynamicCreateDXGIFactory1_;
 		D3D11CreateDeviceFunc DynamicD3D11CreateDevice_;
+		pD3DCompile DynamicD3DCompile_;
 
 		HMODULE mod_d3d11_;
 		HMODULE mod_dxgi_;
+		HMODULE mod_d3dcompiler_;
 
 		IDXGIFactory1Ptr gi_factory_1_;
 		IDXGIFactory2Ptr gi_factory_2_;
-		IDXGIFactory3Ptr gi_factory_3_;
-		IDXGIFactory4Ptr gi_factory_4_;
-		uint8_t dxgi_sub_ver_;
+		IDXGIAdapterPtr gi_adapter_;
+		IDXGISwapChain1Ptr gi_swap_chain_1_;
+
+		ID3D11DevicePtr d3d_device_;
+		ID3D11DeviceContextPtr d3d_imm_ctx_;
+
+		ID3D11RenderTargetViewPtr d3d_render_target_view_;
+		ID3D11Texture2DPtr d3d_depth_stencil_buffer_;
+		ID3D11DepthStencilStatePtr d3d_depth_stencil_state_;
+		ID3D11DepthStencilViewPtr d3d_depth_stencil_view_;
+		ID3D11RasterizerStatePtr d3d_raster_state_;
+
+		ShaderObjectPtr so_;
+		CBufferObjectPtr cb_;
+		std::vector<RenderablePtr> rs_;
 	};
 
 
@@ -338,7 +485,10 @@ namespace epsilon
 		Application();
 
 		void Create(const std::string& name, int width, int height);
+		void Destory();
 
+		RenderEngine& RE() { return *re_; }
+		
 		void Run();
 
 	private:
