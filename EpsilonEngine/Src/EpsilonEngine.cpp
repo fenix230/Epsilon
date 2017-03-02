@@ -21,38 +21,34 @@ void GenerateCube(StaticMeshPtr r)
 
 	std::vector<Vector3f> positions;
 	std::vector<Vector3f> normals;
-	std::vector<Vector3f> diffuses;
-	std::vector<Vector3f> speculars;
-	std::vector<uint32_t> indices;
+	std::vector<Vector2f> texcoords;
+	std::vector<uint16_t> indices;
 
 	auto draw_plane = [&](int a, int b, int c, int d) {
 		Vector3f p1 = verts[a], p2 = verts[b], p3 = verts[c], p4 = verts[d];
-
-		/*p1.attribs.uv.set(0, 0);
-		p2.attribs.uv.set(0, 1);
-		p3.attribs.uv.set(1, 1);
-		p4.attribs.uv.set(1, 0);*/
-
 		Vector3f norm = CrossProduct3((p3 - p2), (p1 - p2));
+		Vector2f tc1(0, 0), tc2(0, 1), tc3(1, 1), tc4(1, 0);
 
-		uint32_t index = (uint32_t)positions.size();
+		uint16_t index = (uint16_t)positions.size();
 		positions.push_back(p1);
 		positions.push_back(p2);
 		positions.push_back(p3);
 		normals.insert(normals.end(), 3, norm);
-		diffuses.insert(diffuses.end(), 3, Vector3f());
-		speculars.insert(speculars.end(), 3, Vector3f());
+		texcoords.push_back(tc1);
+		texcoords.push_back(tc2);
+		texcoords.push_back(tc3);
 		indices.push_back(index);
 		indices.push_back(index + 1);
 		indices.push_back(index + 2);
 
-		index = (uint32_t)positions.size();
+		index = (uint16_t)positions.size();
 		positions.push_back(p3);
 		positions.push_back(p4);
 		positions.push_back(p1);
 		normals.insert(normals.end(), 3, norm);
-		diffuses.insert(diffuses.end(), 3, Vector3f());
-		speculars.insert(speculars.end(), 3, Vector3f());
+		texcoords.push_back(tc3);
+		texcoords.push_back(tc4);
+		texcoords.push_back(tc1);
 		indices.push_back(index);
 		indices.push_back(index + 1);
 		indices.push_back(index + 2);
@@ -67,10 +63,10 @@ void GenerateCube(StaticMeshPtr r)
 
 	r->CreatePositionBuffer(positions);
 	r->CreateNormalBuffer(normals);
-	r->CreateDiffuseBuffer(diffuses);
-	r->CreateSpecularBuffer(speculars);
+	r->CreateTexCoordBuffer(texcoords);
 	r->CreateIndexBuffer(indices);
 }
+
 
 int main()
 {
@@ -84,32 +80,24 @@ int main()
 
 		RenderEngine& re = app.RE();
 
-		CBufferObjectPtr cb = std::make_shared<CBufferObject>();
-		cb->SetRE(re);
+		CBufferObjectPtr cb = re.MakeObject<CBufferObject>();
 		cb->Create();
-		Vector3f eye(0, -3 - 3.5f, 2.0f), at(0, 0, 0), up(0, 0, 1);
+		Vector3f eye(0, -1.5, 2.0f), at(0, 0, 0), up(0, 0, 1);
 		cb->camera_.LookAt(eye, at, up);
 		cb->camera_.Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
 		re.SetCBufferObject(cb);
 
-		ShaderObjectPtr so = std::make_shared<ShaderObject>();
-		so->SetRE(re);
+		ShaderObjectPtr so = re.MakeObject<ShaderObject>();
 		so->CreateVS("../../../Media/Shader/VertexShader.hlsl", "main");
 		so->CreatePS("../../../Media/Shader/PixelShader.hlsl", "main");
 		re.SetShaderObject(so);
 
-		StaticMeshPtr r = std::make_shared<StaticMesh>();
-		r->SetRE(re);
+		StaticMeshPtr r = re.MakeObject<StaticMesh>();
 		GenerateCube(r);
+		r->CreateTexture("../../../Media/Texture/spnza_bricks_a_diff.dds");
 		re.AddRenderable(r);
 
 		app.Run();
-
-		cb.reset();
-		so.reset();
-		r.reset();
-
-		app.Destory();
 	}
 	catch (const std::exception& e)
 	{

@@ -8,10 +8,30 @@
 #include <vector>
 #include <fstream>
 #include <d3dcompiler.h>
+#include "DDSTextureLoader\DDSTextureLoader.h"
 
 
 namespace epsilon
 {
+
+	std::wstring ToWstring(const std::string& str, const std::locale& loc = std::locale())
+	{
+		std::vector<wchar_t> buf(str.size());
+		std::use_facet<std::ctype<wchar_t>>(loc).widen(str.data(),//ctype<char_type>  
+			str.data() + str.size(),
+			buf.data());//把char转换为T  
+		return std::wstring(buf.data(), buf.size());
+	}
+
+	std::string ToString(const std::wstring& str, const std::locale& loc = std::locale())
+	{
+		std::vector<char> buf(str.size());
+		std::use_facet<std::ctype<wchar_t>>(loc).narrow(str.data(),
+			str.data() + str.size(),
+			'?', buf.data());//把T转换为char  
+		return std::string(buf.data(), buf.size());
+	}
+
 
 	inline std::string CombineFileLine(std::string const & file, int line)
 	{
@@ -347,11 +367,9 @@ namespace epsilon
 		buffer_data.SysMemPitch = 0;
 		buffer_data.SysMemSlicePitch = 0;
 
-		ID3D11Buffer* d3d_position_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_position_buffer));
-		d3d_position_buffer_ = MakeCOMPtr(d3d_position_buffer);
-
-		num_position_ = (UINT)positions.size();
+		ID3D11Buffer* d3d_buffer = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
+		d3d_vertex_buffers_[NB_Position] = MakeCOMPtr(d3d_buffer);
 	}
 
 	void StaticMesh::CreateNormalBuffer(const std::vector<Vector3f>& normals)
@@ -369,62 +387,36 @@ namespace epsilon
 		buffer_data.SysMemPitch = 0;
 		buffer_data.SysMemSlicePitch = 0;
 
-		ID3D11Buffer* d3d_normal_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_normal_buffer));
-		d3d_normal_buffer_ = MakeCOMPtr(d3d_normal_buffer);
-
-		num_normal_ = (UINT)normals.size();
+		ID3D11Buffer* d3d_buffer = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
+		d3d_vertex_buffers_[NB_Normal] = MakeCOMPtr(d3d_buffer);
 	}
 
-	void StaticMesh::CreateDiffuseBuffer(const std::vector<Vector3f>& diffuses)
+	void StaticMesh::CreateTexCoordBuffer(const std::vector<Vector2f>& tcs)
 	{
 		D3D11_BUFFER_DESC buffer_desc;
 		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(Vector3f) * (UINT)diffuses.size();
+		buffer_desc.ByteWidth = sizeof(Vector2f) * (UINT)tcs.size();
 		buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 		buffer_desc.CPUAccessFlags = 0;
 		buffer_desc.MiscFlags = 0;
 		buffer_desc.StructureByteStride = 0;
 
 		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = diffuses.data();
+		buffer_data.pSysMem = tcs.data();
 		buffer_data.SysMemPitch = 0;
 		buffer_data.SysMemSlicePitch = 0;
 
-		ID3D11Buffer* d3d_diffuse_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_diffuse_buffer));
-		d3d_diffuse_buffer_ = MakeCOMPtr(d3d_diffuse_buffer);
-
-		num_diffuse_ = (UINT)diffuses.size();
+		ID3D11Buffer* d3d_buffer = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
+		d3d_vertex_buffers_[NB_TexCoord] = MakeCOMPtr(d3d_buffer);
 	}
 
-	void StaticMesh::CreateSpecularBuffer(const std::vector<Vector3f>& speculars)
+	void StaticMesh::CreateIndexBuffer(const std::vector<uint16_t>& indices)
 	{
 		D3D11_BUFFER_DESC buffer_desc;
 		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(Vector3f) * (UINT)speculars.size();
-		buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		buffer_desc.CPUAccessFlags = 0;
-		buffer_desc.MiscFlags = 0;
-		buffer_desc.StructureByteStride = 0;
-
-		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = speculars.data();
-		buffer_data.SysMemPitch = 0;
-		buffer_data.SysMemSlicePitch = 0;
-
-		ID3D11Buffer* d3d_specular_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_specular_buffer));
-		d3d_specular_buffer_ = MakeCOMPtr(d3d_specular_buffer);
-
-		num_specular_ = (UINT)speculars.size();
-	}
-
-	void StaticMesh::CreateIndexBuffer(const std::vector<uint32_t>& indices)
-	{
-		D3D11_BUFFER_DESC buffer_desc;
-		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(uint32_t) * (UINT)indices.size();
+		buffer_desc.ByteWidth = sizeof(uint16_t) * (UINT)indices.size();
 		buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 		buffer_desc.CPUAccessFlags = 0;
 		buffer_desc.MiscFlags = 0;
@@ -440,6 +432,17 @@ namespace epsilon
 		d3d_index_buffer_ = MakeCOMPtr(d3d_index_buffer);
 
 		num_indice_ = (UINT)indices.size();
+	}
+
+	void StaticMesh::CreateTexture(const std::string& file_path)
+	{
+		std::wstring wfile_path = ToWstring(file_path);
+
+		ID3D11Resource* d3d_tex_res = nullptr;
+		ID3D11ShaderResourceView* d3d_tex_sr_view = nullptr;
+		THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_sr_view));
+		d3d_tex_res_ = MakeCOMPtr(d3d_tex_res);
+		d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
 	}
 
 	void StaticMesh::PositionElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
@@ -464,22 +467,11 @@ namespace epsilon
 		desc.InstanceDataStepRate = 0;
 	}
 
-	void StaticMesh::DiffuseElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
+	void StaticMesh::TexCoordElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
 	{
-		desc.SemanticName = "DIFFUSE";
+		desc.SemanticName = "TEXCOORD";
 		desc.SemanticIndex = 0;
-		desc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		desc.InputSlot = 0;
-		desc.AlignedByteOffset = 0;
-		desc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		desc.InstanceDataStepRate = 0;
-	}
-
-	void StaticMesh::SpecularElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
-	{
-		desc.SemanticName = "SPECULAR";
-		desc.SemanticIndex = 0;
-		desc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		desc.Format = DXGI_FORMAT_R32G32_FLOAT;
 		desc.InputSlot = 0;
 		desc.AlignedByteOffset = 0;
 		desc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
@@ -496,11 +488,10 @@ namespace epsilon
 			}
 		}
 
-		std::array<D3D11_INPUT_ELEMENT_DESC, 4> d3d_elems_descs;
-		this->PositionElemDesc(d3d_elems_descs[0]);
-		this->NormalElemDesc(d3d_elems_descs[1]);
-		this->DiffuseElemDesc(d3d_elems_descs[2]);
-		this->SpecularElemDesc(d3d_elems_descs[3]);
+		std::array<D3D11_INPUT_ELEMENT_DESC, NB_Count> d3d_elems_descs;
+		this->PositionElemDesc(d3d_elems_descs[NB_Position]);
+		this->NormalElemDesc(d3d_elems_descs[NB_Normal]);
+		this->TexCoordElemDesc(d3d_elems_descs[NB_TexCoord]);
 
 		const std::vector<uint8_t>& vs_code = so->VSCode();
 
@@ -515,10 +506,6 @@ namespace epsilon
 
 	StaticMesh::StaticMesh()
 	{
-		num_position_ = 0;
-		num_normal_ = 0;
-		num_diffuse_ = 0;
-		num_specular_ = 0;
 		num_indice_ = 0;
 	}
 
@@ -530,43 +517,45 @@ namespace epsilon
 	void StaticMesh::Destory()
 	{
 		d3d_input_layouts_.clear();
-		d3d_position_buffer_.reset();
-		d3d_normal_buffer_.reset();
-		d3d_diffuse_buffer_.reset();
-		d3d_specular_buffer_.reset();
+		for (auto i = d3d_vertex_buffers_.begin(); i != d3d_vertex_buffers_.end(); i++)
+		{
+			(*i).reset();
+		}
 		d3d_index_buffer_.reset();
+		d3d_tex_res_.reset();
+		d3d_tex_sr_view_.reset();
 	}
 
 	void StaticMesh::Bind()
 	{
-		static const UINT num_buffers = 4;
-
-		std::array<ID3D11Buffer*, num_buffers> buffers = {
-			d3d_position_buffer_.get(),
-			d3d_normal_buffer_.get(),
-			d3d_diffuse_buffer_.get(),
-			d3d_specular_buffer_.get()
+		std::array<ID3D11Buffer*, NB_Count> buffers = {
+			d3d_vertex_buffers_[NB_Position].get(),
+			d3d_vertex_buffers_[NB_Normal].get(),
+			d3d_vertex_buffers_[NB_TexCoord].get()
 		};
 
-		std::array<UINT, num_buffers> strides = {
-			num_position_,
-			num_normal_,
-			num_diffuse_,
-			num_specular_
+		std::array<UINT, NB_Count> strides = {
+			sizeof(Vector3f),
+			sizeof(Vector3f),
+			sizeof(Vector2f)
 		};
 
-		std::array<UINT, num_buffers> offsets = {
-			0,
+		std::array<UINT, NB_Count> offsets = {
 			0,
 			0,
 			0
 		};
 
-		re_->D3DContext()->IASetVertexBuffers(0, 4, buffers.data(), strides.data(), offsets.data());
+		re_->D3DContext()->IASetVertexBuffers(0, NB_Count, buffers.data(), strides.data(), offsets.data());
 
-		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R32_UINT, 0);
+		re_->D3DContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R16_UINT, 0);
 
-		re_->D3DContext()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		if (d3d_tex_sr_view_)
+		{
+			ID3D11ShaderResourceView* d3d_sr_view = d3d_tex_sr_view_.get();
+			re_->D3DContext()->PSSetShaderResources(0, 1, &d3d_sr_view);
+		}
 	}
 
 	void StaticMesh::Render(ShaderObject* so)
@@ -578,10 +567,9 @@ namespace epsilon
 		re_->D3DContext()->DrawIndexed(num_indice_, 0, 0);
 	}
 
-
 	void Camera::LookAt(Vector3f pos, Vector3f target, Vector3f up)
 	{
-		view = XMMatrixLookAtLH(pos.XMVStore(), target.XMVStore(), up.XMVStore());
+		view = XMMatrixLookAtLH(pos.XMV(), target.XMV(), up.XMV());
 	}
 
 	void Camera::Perspective(float ang, float aspect, float near_plane, float far_plane)
@@ -704,12 +692,32 @@ namespace epsilon
 		ID3D11PixelShader* d3d_ps = nullptr;
 		THROW_FAILED(re_->D3DDevice()->CreatePixelShader(shader_code.data(), shader_code.size(), nullptr, &d3d_ps));
 		d3d_ps_ = MakeCOMPtr(d3d_ps);
+
+		D3D11_SAMPLER_DESC d3d_sampler_desc;
+		d3d_sampler_desc.Filter = D3D11_FILTER_ANISOTROPIC;
+		d3d_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+		d3d_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+		d3d_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+		d3d_sampler_desc.MipLODBias = 0.0f;
+		d3d_sampler_desc.MaxAnisotropy = 1;
+		d3d_sampler_desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+		d3d_sampler_desc.BorderColor[0] = 0;
+		d3d_sampler_desc.BorderColor[1] = 0;
+		d3d_sampler_desc.BorderColor[2] = 0;
+		d3d_sampler_desc.BorderColor[3] = 0;
+		d3d_sampler_desc.MinLOD = 0;
+		d3d_sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+
+		ID3D11SamplerState* d3d_sampler_state = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateSamplerState(&d3d_sampler_desc, &d3d_sampler_state));
+		d3d_sampler_state_ = MakeCOMPtr(d3d_sampler_state);
 	}
 
 	void ShaderObject::Destory()
 	{
 		d3d_vs_.reset();
 		d3d_ps_.reset();
+		d3d_sampler_state_.reset();
 		re_ = nullptr;
 	}
 
@@ -722,6 +730,9 @@ namespace epsilon
 	{
 		re_->D3DContext()->VSSetShader(d3d_vs_.get(), nullptr, 0);
 		re_->D3DContext()->PSSetShader(d3d_ps_.get(), nullptr, 0);
+
+		ID3D11SamplerState* d3d_sampler_state = d3d_sampler_state_.get();
+		re_->D3DContext()->PSSetSamplers(0, 1, &d3d_sampler_state);
 	}
 
 
@@ -985,7 +996,7 @@ namespace epsilon
 
 	void RenderEngine::Frame()
 	{
-		float clean_color[4] = {0, 0, 0, 1};
+		float clean_color[4] = {0.2f, 0.2f, 0.6f, 1};
 		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
 		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -1048,6 +1059,11 @@ namespace epsilon
 	Application::Application()
 	{
 
+	}
+
+	Application::~Application()
+	{
+		this->Destory();
 	}
 
 	void Application::Create(const std::string& name, int width, int height)

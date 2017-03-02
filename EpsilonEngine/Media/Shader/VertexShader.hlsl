@@ -1,23 +1,37 @@
-cbuffer CB
+cbuffer Constant
 {
 	matrix world_mat;
 	matrix view_mat;
 	matrix proj_mat;
 };
 
-float4 main(
-	float4 pos : POSITION, 
-	float3 normal : NORMAL,
-	float3 diffuse : DIFFUSE,
-	float3 specular : SPECULAR
-) : SV_POSITION
+struct Output
 {
-	float4 out_pos = pos;
+	float4 pos : SV_POSITION;
+	float3 norm : NORMAL;
+	float2 tc : TEXCOORD;
+};
 
-	out_pos.w = 1.0f;
-	out_pos = mul(out_pos, world_mat);
-	out_pos = mul(out_pos, view_mat);
-	out_pos = mul(out_pos, proj_mat);
+Output main(
+	float4 pos : POSITION,
+	float3 norm : NORMAL,
+	float2 tc : TEXCOORD
+)
+{
+	Output output;
+	
+	output.pos = pos;
+	output.pos = mul(output.pos, world_mat);
+	output.pos = mul(output.pos, view_mat);
+	output.pos = mul(output.pos, proj_mat);
 
-	return out_pos;
+	float4 norm4 = float4(norm.x, norm.y, norm.z, 0.0);
+	norm4 = mul(norm4, world_mat);
+	norm4 = mul(norm4, view_mat);
+	norm4 = mul(norm4, proj_mat);
+	output.norm = norm4.xyz;
+
+	output.tc = tc;
+
+	return output;
 }

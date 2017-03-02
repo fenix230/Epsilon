@@ -5,13 +5,12 @@
 #include <memory>
 #include <functional>
 #include <DirectXMath.h>
-#include <dxgi1_4.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
 #include <d3d11_2.h>
-#include <d3d11_3.h>
 #include <vector>
 #include <d3dcompiler.h>
+#include <array>
 
 
 namespace epsilon
@@ -21,68 +20,68 @@ namespace epsilon
 #define DEFINE_VECTOR_OPERATORS(VECTOR)\
 	inline VECTOR& operator+= (VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorAdd(v1.XMVStore(), v2.XMVStore());\
-		return v1.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorAdd(v1.XMV(), v2.XMV());\
+		return v1.XMV(vm);\
 	}\
 	inline VECTOR& operator-= (VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorSubtract(v1.XMVStore(), v2.XMVStore());\
-		return v1.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorSubtract(v1.XMV(), v2.XMV());\
+		return v1.XMV(vm);\
 	}\
 	inline VECTOR& operator*= (VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorMultiply(v1.XMVStore(), v2.XMVStore());\
-		return v1.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorMultiply(v1.XMV(), v2.XMV());\
+		return v1.XMV(vm);\
 	}\
 	inline VECTOR& operator/= (VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorDivide(v1.XMVStore(), v2.XMVStore());\
-		return v1.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorDivide(v1.XMV(), v2.XMV());\
+		return v1.XMV(vm);\
 	}\
 	inline VECTOR& operator*= (VECTOR& v, float s)\
 	{\
-		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
-		return v.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorScale(v.XMV(), s);\
+		return v.XMV(vm);\
 	}\
 	inline VECTOR& operator/= (VECTOR& v, float s)\
 	{\
-		XMVECTOR vm = XMVectorScale(v.XMVStore(), 1 / s);\
-		return v.XMVLoad(vm);\
+		XMVECTOR vm = XMVectorScale(v.XMV(), 1 / s);\
+		return v.XMV(vm);\
 	}\
 	inline VECTOR operator+ (const VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorAdd(v1.XMVStore(), v2.XMVStore());\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorAdd(v1.XMV(), v2.XMV());\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator- (const VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorSubtract(v1.XMVStore(), v2.XMVStore());\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorSubtract(v1.XMV(), v2.XMV());\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator* (const VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorMultiply(v1.XMVStore(), v2.XMVStore());\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorMultiply(v1.XMV(), v2.XMV());\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator/ (const VECTOR& v1, const VECTOR& v2)\
 	{\
-		XMVECTOR vm = XMVectorDivide(v1.XMVStore(), v2.XMVStore());\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorDivide(v1.XMV(), v2.XMV());\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator* (const VECTOR& v, float s)\
 	{\
-		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorScale(v.XMV(), s);\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator* (float s, const VECTOR& v)\
 	{\
-		XMVECTOR vm = XMVectorScale(v.XMVStore(), s);\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorScale(v.XMV(), s);\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator/ (const VECTOR& v, float s)\
 	{\
-		XMVECTOR vm = XMVectorScale(v.XMVStore(), 1 / s);\
-		return VECTOR().XMVLoad(vm);\
+		XMVECTOR vm = XMVectorScale(v.XMV(), 1 / s);\
+		return VECTOR().XMV(vm);\
 	}\
 	inline VECTOR operator+ (const VECTOR& v)\
 	{\
@@ -99,8 +98,8 @@ namespace epsilon
 		Vector2f(float xx, float yy) : XMFLOAT2(xx, yy) {}
 		explicit Vector2f(const float* arr) : XMFLOAT2(arr) {}
 
-		XMVECTOR XMVStore() const { return XMLoadFloat2(this); }
-		Vector2f& XMVLoad(const XMVECTOR& v) { XMStoreFloat2(this, v); return *this; }
+		XMVECTOR XMV() const { return XMLoadFloat2(this); }
+		Vector2f& XMV(const XMVECTOR& v) { XMStoreFloat2(this, v); return *this; }
 	};
 
 	DEFINE_VECTOR_OPERATORS(Vector2f);
@@ -112,8 +111,8 @@ namespace epsilon
 		Vector3f(float xx, float yy, float zz) : XMFLOAT3(xx, yy, zz) {}
 		explicit Vector3f(const float* arr) : XMFLOAT3(arr) {}
 
-		XMVECTOR XMVStore() const { return XMLoadFloat3(this); }
-		Vector3f& XMVLoad(const XMVECTOR& v) { XMStoreFloat3(this, v); return *this; }
+		XMVECTOR XMV() const { return XMLoadFloat3(this); }
+		Vector3f& XMV(const XMVECTOR& v) { XMStoreFloat3(this, v); return *this; }
 	};
 
 	DEFINE_VECTOR_OPERATORS(Vector3f);
@@ -121,7 +120,7 @@ namespace epsilon
 	inline Vector3f CrossProduct3(const Vector3f& v1, const Vector3f& v2)
 	{
 		Vector3f rv;
-		rv.XMVLoad(XMVector3Cross(v1.XMVStore(), v2.XMVStore()));
+		rv.XMV(XMVector3Cross(v1.XMV(), v2.XMV()));
 		return rv;
 	}
 
@@ -132,8 +131,8 @@ namespace epsilon
 		Vector4f(float xx, float yy, float zz, float ww) : XMFLOAT4(xx, yy, zz, ww) {}
 		explicit Vector4f(const float* arr) : XMFLOAT4(arr) {}
 
-		XMVECTOR XMVStore() const { return XMLoadFloat4(this); }
-		Vector4f& XMVLoad(const XMVECTOR& v) { XMStoreFloat4(this, v); return *this; }
+		XMVECTOR XMV() const { return XMLoadFloat4(this); }
+		Vector4f& XMV(const XMVECTOR& v) { XMStoreFloat4(this, v); return *this; }
 	};
 
 	DEFINE_VECTOR_OPERATORS(Vector4f);
@@ -158,49 +157,45 @@ namespace epsilon
 
 	inline Vector4f Transform(const Vector4f& v, const Matrix& mat)
 	{
-		return Vector4f().XMVLoad(XMVector4Transform(v.XMVStore(), mat));
+		return Vector4f().XMV(XMVector4Transform(v.XMV(), mat));
 	}
 
 	inline Vector3f TransformCoord(const Vector3f& v, const Matrix& mat)
 	{
-		return Vector3f().XMVLoad(XMVector3TransformCoord(v.XMVStore(), mat));
+		return Vector3f().XMV(XMVector3TransformCoord(v.XMV(), mat));
 	}
 
 	inline Vector3f TransformNormal(const Vector3f& v, const Matrix& mat)
 	{
-		return Vector3f().XMVLoad(XMVector3TransformNormal(v.XMVStore(), mat));
+		return Vector3f().XMV(XMVector3TransformNormal(v.XMV(), mat));
 	}
 
 	inline Vector2f TransformCoord(const Vector2f& v, const Matrix& mat)
 	{
-		return Vector2f().XMVLoad(XMVector2TransformCoord(v.XMVStore(), mat));
+		return Vector2f().XMV(XMVector2TransformCoord(v.XMV(), mat));
 	}
 
 	inline Vector2f TransformNormal(const Vector2f& v, const Matrix& mat)
 	{
-		return Vector2f().XMVLoad(XMVector2TransformNormal(v.XMVStore(), mat));
+		return Vector2f().XMV(XMVector2TransformNormal(v.XMV(), mat));
 	}
 
 
 	typedef std::shared_ptr<IDXGIFactory1>				IDXGIFactory1Ptr;
 	typedef std::shared_ptr<IDXGIFactory2>				IDXGIFactory2Ptr;
 	typedef std::shared_ptr<IDXGIFactory3>				IDXGIFactory3Ptr;
-	typedef std::shared_ptr<IDXGIFactory4>				IDXGIFactory4Ptr;
 	typedef std::shared_ptr<IDXGIAdapter>				IDXGIAdapterPtr;
 	typedef std::shared_ptr<IDXGIAdapter1>				IDXGIAdapter1Ptr;
 	typedef std::shared_ptr<IDXGIAdapter2>				IDXGIAdapter2Ptr;
 	typedef std::shared_ptr<IDXGISwapChain>				IDXGISwapChainPtr;
 	typedef std::shared_ptr<IDXGISwapChain1>			IDXGISwapChain1Ptr;
 	typedef std::shared_ptr<IDXGISwapChain2>			IDXGISwapChain2Ptr;
-	typedef std::shared_ptr<IDXGISwapChain3>			IDXGISwapChain3Ptr;
 	typedef std::shared_ptr<ID3D11Device>				ID3D11DevicePtr;
 	typedef std::shared_ptr<ID3D11Device1>				ID3D11Device1Ptr;
 	typedef std::shared_ptr<ID3D11Device2>				ID3D11Device2Ptr;
-	typedef std::shared_ptr<ID3D11Device3>				ID3D11Device3Ptr;
 	typedef std::shared_ptr<ID3D11DeviceContext>		ID3D11DeviceContextPtr;
 	typedef std::shared_ptr<ID3D11DeviceContext1>		ID3D11DeviceContext1Ptr;
 	typedef std::shared_ptr<ID3D11DeviceContext2>		ID3D11DeviceContext2Ptr;
-	typedef std::shared_ptr<ID3D11DeviceContext3>		ID3D11DeviceContext3Ptr;
 	typedef std::shared_ptr<ID3D11Resource>				ID3D11ResourcePtr;
 	typedef std::shared_ptr<ID3D11Texture1D>			ID3D11Texture1DPtr;
 	typedef std::shared_ptr<ID3D11Texture2D>			ID3D11Texture2DPtr;
@@ -308,6 +303,17 @@ namespace epsilon
 	DEFINE_SMART_POINTER(StaticMesh);
 
 
+	struct REObject
+	{
+		REObject() : re_(nullptr) {}
+		virtual ~REObject() {}
+
+		inline void SetRE(RenderEngine& re) { re_ = &re; }
+
+		RenderEngine* re_;
+	};
+
+
 	struct Camera
 	{
 		void LookAt(Vector3f pos, Vector3f target, Vector3f up);
@@ -320,13 +326,11 @@ namespace epsilon
 	};
 
 
-	class CBufferObject
+	class CBufferObject : public REObject
 	{
 	public:
 		CBufferObject();
-		~CBufferObject();
-
-		INTERFACE_SET_RE;
+		virtual ~CBufferObject();
 
 		void Create();
 		void Destory();
@@ -341,34 +345,31 @@ namespace epsilon
 	};
 
 
-	class ShaderObject
+	class ShaderObject : public REObject
 	{
 	public:
 		ShaderObject();
-		~ShaderObject();
-
-		INTERFACE_SET_RE;
+		virtual ~ShaderObject();
 
 		void CreateVS(std::string file_path, std::string entry_point);
 		void CreatePS(std::string file_path, std::string entry_point);
 		void Destory();
 
-		const std::vector<uint8_t>& VSCode();
-
 		void Bind();
+
+		const std::vector<uint8_t>& VSCode();
 
 	private:
 		ID3D11VertexShaderPtr d3d_vs_;
 		ID3D11PixelShaderPtr d3d_ps_;
+		ID3D11SamplerStatePtr d3d_sampler_state_;
 		std::vector<uint8_t> vs_code_;
 	};
 
 
-	class Renderable
+	class Renderable : public REObject
 	{
 	public:
-		INTERFACE_SET_RE;
-
 		virtual void Bind() = 0;
 		virtual void Render(ShaderObject* so) = 0;
 	};
@@ -378,41 +379,43 @@ namespace epsilon
 	{
 	public:
 		StaticMesh();
-		~StaticMesh();
+		virtual ~StaticMesh();
 
 		virtual void Bind() override;
 		virtual void Render(ShaderObject* so) override;
 
 		void CreatePositionBuffer(const std::vector<Vector3f>& positions);
 		void CreateNormalBuffer(const std::vector<Vector3f>& normals);
-		void CreateDiffuseBuffer(const std::vector<Vector3f>& diffuses);
-		void CreateSpecularBuffer(const std::vector<Vector3f>& speculars);
-		void CreateIndexBuffer(const std::vector<uint32_t>& indices);
+		void CreateTexCoordBuffer(const std::vector<Vector2f>& tcs);
+		void CreateIndexBuffer(const std::vector<uint16_t>& indices);
+		void CreateTexture(const std::string& file_path);
 
 		void Destory();
 
 	private:
 		void PositionElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
 		void NormalElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
-		void DiffuseElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
-		void SpecularElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
+		void TexCoordElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
 
 		ID3D11InputLayout* D3DInputLayout(ShaderObject* so);
 
 	private:
-		ID3D11BufferPtr d3d_position_buffer_;
-		ID3D11BufferPtr d3d_normal_buffer_;
-		ID3D11BufferPtr d3d_diffuse_buffer_;
-		ID3D11BufferPtr d3d_specular_buffer_;
+		enum NumBuffer
+		{
+			NB_Position = 0,
+			NB_Normal = 1,
+			NB_TexCoord = 2,
+			NB_Count = 3
+		};
+		std::array<ID3D11BufferPtr, NB_Count> d3d_vertex_buffers_;
 		ID3D11BufferPtr d3d_index_buffer_;
 
-		UINT num_position_;
-		UINT num_normal_;
-		UINT num_diffuse_;
-		UINT num_specular_;
 		UINT num_indice_;
 
 		std::vector<std::pair<ShaderObject*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
+
+		ID3D11ResourcePtr d3d_tex_res_;
+		ID3D11ShaderResourceViewPtr d3d_tex_sr_view_;
 	};
 
 
@@ -432,6 +435,14 @@ namespace epsilon
 		void AddRenderable(RenderablePtr r);
 
 		void Frame();
+
+		template<class T>
+		std::shared_ptr<T> MakeObject()
+		{
+			std::shared_ptr<T> obj = std::make_shared<T>();
+			obj->SetRE(*this);
+			return obj;
+		}
 
 		ID3D11Device* D3DDevice();
 
@@ -483,6 +494,7 @@ namespace epsilon
 	{
 	public:
 		Application();
+		~Application();
 
 		void Create(const std::string& name, int width, int height);
 		void Destory();
