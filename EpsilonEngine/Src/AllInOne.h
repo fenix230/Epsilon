@@ -281,7 +281,7 @@ namespace epsilon
 
 		bool hide_;
 		bool external_wnd_;
-		std::string name_;
+		std::wstring name_;
 
 		HWND wnd_;
 		WNDPROC default_wnd_proc_;
@@ -297,7 +297,7 @@ namespace epsilon
 	RenderEngine* re_;
 
 	class RenderEngine;
-	DEFINE_SMART_POINTER(CBufferObject);
+	DEFINE_SMART_POINTER(CBufferPerFrame);
 	DEFINE_SMART_POINTER(ShaderObject);
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
@@ -326,11 +326,11 @@ namespace epsilon
 	};
 
 
-	class CBufferObject : public REObject
+	class CBufferPerFrame : public REObject
 	{
 	public:
-		CBufferObject();
-		virtual ~CBufferObject();
+		CBufferPerFrame();
+		virtual ~CBufferPerFrame();
 
 		void Create();
 		void Destory();
@@ -384,30 +384,33 @@ namespace epsilon
 		virtual void Bind() override;
 		virtual void Render(ShaderObject* so) override;
 
-		void CreatePositionBuffer(const std::vector<Vector3f>& positions);
-		void CreateNormalBuffer(const std::vector<Vector3f>& normals);
-		void CreateTexCoordBuffer(const std::vector<Vector2f>& tcs);
-		void CreateIndexBuffer(const std::vector<uint16_t>& indices);
+		void CreateVertexBuffer(size_t num_vert, 
+			const Vector3f* pos_data, 
+			const Vector3f* norm_data, 
+			const Vector2f* tc_data);
+		void CreateIndexBuffer(size_t num_indice, const uint16_t* data);
 		void CreateTexture(const std::string& file_path);
+		void CreateCBuffer();
 
 		void Destory();
 
 	private:
-		void PositionElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
-		void NormalElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
-		void TexCoordElemDesc(D3D11_INPUT_ELEMENT_DESC& desc);
-
 		ID3D11InputLayout* D3DInputLayout(ShaderObject* so);
 
 	private:
-		enum NumBuffer
+		struct VS_INPUT
 		{
-			NB_Position = 0,
-			NB_Normal = 1,
-			NB_TexCoord = 2,
-			NB_Count = 3
+			Vector3f pos;
+			Vector3f norm;
+			Vector2f tc;
 		};
-		std::array<ID3D11BufferPtr, NB_Count> d3d_vertex_buffers_;
+
+		struct VS_CONSTANT_PER_MESH
+		{
+			bool tex_enabled;
+		};
+
+		ID3D11BufferPtr d3d_vertex_buffer_;
 		ID3D11BufferPtr d3d_index_buffer_;
 
 		UINT num_indice_;
@@ -416,6 +419,8 @@ namespace epsilon
 
 		ID3D11ResourcePtr d3d_tex_res_;
 		ID3D11ShaderResourceViewPtr d3d_tex_sr_view_;
+
+		ID3D11BufferPtr d3d_cbuffer_;
 	};
 
 
@@ -430,7 +435,7 @@ namespace epsilon
 
 		void SetShaderObject(ShaderObjectPtr so);
 
-		void SetCBufferObject(CBufferObjectPtr cb);
+		void SetCBufferPerFrame(CBufferPerFramePtr cb);
 
 		void AddRenderable(RenderablePtr r);
 
@@ -485,7 +490,7 @@ namespace epsilon
 		ID3D11RasterizerStatePtr d3d_raster_state_;
 
 		ShaderObjectPtr so_;
-		CBufferObjectPtr cb_;
+		CBufferPerFramePtr cb_;
 		std::vector<RenderablePtr> rs_;
 	};
 

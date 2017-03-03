@@ -59,8 +59,8 @@ namespace epsilon
 		HINSTANCE hInst = ::GetModuleHandle(nullptr);
 
 		// Register the window class
-		name_ = name;
-		WNDCLASSEXA wc;
+		name_ = ToWstring(name);
+		WNDCLASSEXW wc;
 		wc.cbSize = sizeof(wc);
 		wc.style = CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = WndProc;
@@ -73,7 +73,7 @@ namespace epsilon
 		wc.lpszMenuName = nullptr;
 		wc.lpszClassName = name_.c_str();
 		wc.hIconSm = nullptr;
-		::RegisterClassExA(&wc);
+		::RegisterClassExW(&wc);
 
 		uint32_t style = WS_OVERLAPPEDWINDOW;
 
@@ -82,7 +82,7 @@ namespace epsilon
 
 		// Create our main window
 		// Pass pointer to self
-		wnd_ = ::CreateWindowA(name_.c_str(), name_.c_str(),
+		wnd_ = ::CreateWindowW(name_.c_str(), name_.c_str(),
 			style, 100, 50,
 			rc.right - rc.left, rc.bottom - rc.top, 0, 0, hInst, nullptr);
 
@@ -97,7 +97,7 @@ namespace epsilon
 
 #pragma warning(push)
 #pragma warning(disable: 4244) // Pointer to LONG_PTR, possible loss of data
-		::SetWindowLongPtrA(wnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+		::SetWindowLongPtrW(wnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 #pragma warning(pop)
 
 		::ShowWindow(wnd_, hide_ ? SW_HIDE : SW_SHOWNORMAL);
@@ -112,7 +112,7 @@ namespace epsilon
 		{
 #pragma warning(push)
 #pragma warning(disable: 4244) // Pointer to LONG_PTR, possible loss of data
-			::SetWindowLongPtrA(wnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(nullptr));
+			::SetWindowLongPtrW(wnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(nullptr));
 #pragma warning(pop)
 
 			if (!external_wnd_)
@@ -352,78 +352,49 @@ namespace epsilon
 	}
 
 
-	void StaticMesh::CreatePositionBuffer(const std::vector<Vector3f>& positions)
+	void StaticMesh::CreateVertexBuffer(size_t num_vert, 
+		const Vector3f* pos_data, 
+		const Vector3f* norm_data,
+		const Vector2f* tc_data)
 	{
+		std::vector<VS_INPUT> vs_inputs(num_vert);
+		for (size_t i = 0; i != num_vert; i++)
+		{
+			vs_inputs[i].pos = pos_data[i];
+			vs_inputs[i].norm = norm_data[i];
+			vs_inputs[i].tc = tc_data[i];
+		}
+
 		D3D11_BUFFER_DESC buffer_desc;
 		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(Vector3f) * (UINT)positions.size();
+		buffer_desc.ByteWidth = sizeof(VS_INPUT) * (UINT)num_vert;
 		buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 		buffer_desc.CPUAccessFlags = 0;
 		buffer_desc.MiscFlags = 0;
 		buffer_desc.StructureByteStride = 0;
 
 		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = positions.data();
+		buffer_data.pSysMem = vs_inputs.data();
 		buffer_data.SysMemPitch = 0;
 		buffer_data.SysMemSlicePitch = 0;
 
 		ID3D11Buffer* d3d_buffer = nullptr;
 		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
-		d3d_vertex_buffers_[NB_Position] = MakeCOMPtr(d3d_buffer);
+		d3d_vertex_buffer_ = MakeCOMPtr(d3d_buffer);
 	}
 
-	void StaticMesh::CreateNormalBuffer(const std::vector<Vector3f>& normals)
+	void StaticMesh::CreateIndexBuffer(size_t num_indice, const uint16_t* data)
 	{
 		D3D11_BUFFER_DESC buffer_desc;
 		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(Vector3f) * (UINT)normals.size();
-		buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		buffer_desc.CPUAccessFlags = 0;
-		buffer_desc.MiscFlags = 0;
-		buffer_desc.StructureByteStride = 0;
-
-		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = normals.data();
-		buffer_data.SysMemPitch = 0;
-		buffer_data.SysMemSlicePitch = 0;
-
-		ID3D11Buffer* d3d_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
-		d3d_vertex_buffers_[NB_Normal] = MakeCOMPtr(d3d_buffer);
-	}
-
-	void StaticMesh::CreateTexCoordBuffer(const std::vector<Vector2f>& tcs)
-	{
-		D3D11_BUFFER_DESC buffer_desc;
-		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(Vector2f) * (UINT)tcs.size();
-		buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		buffer_desc.CPUAccessFlags = 0;
-		buffer_desc.MiscFlags = 0;
-		buffer_desc.StructureByteStride = 0;
-
-		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = tcs.data();
-		buffer_data.SysMemPitch = 0;
-		buffer_data.SysMemSlicePitch = 0;
-
-		ID3D11Buffer* d3d_buffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
-		d3d_vertex_buffers_[NB_TexCoord] = MakeCOMPtr(d3d_buffer);
-	}
-
-	void StaticMesh::CreateIndexBuffer(const std::vector<uint16_t>& indices)
-	{
-		D3D11_BUFFER_DESC buffer_desc;
-		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(uint16_t) * (UINT)indices.size();
+		buffer_desc.ByteWidth = sizeof(uint16_t) * (UINT)num_indice;
 		buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 		buffer_desc.CPUAccessFlags = 0;
 		buffer_desc.MiscFlags = 0;
 		buffer_desc.StructureByteStride = 0;
 
 		D3D11_SUBRESOURCE_DATA buffer_data;
-		buffer_data.pSysMem = indices.data();
+		buffer_data.pSysMem = data;
 		buffer_data.SysMemPitch = 0;
 		buffer_data.SysMemSlicePitch = 0;
 
@@ -431,7 +402,7 @@ namespace epsilon
 		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_index_buffer));
 		d3d_index_buffer_ = MakeCOMPtr(d3d_index_buffer);
 
-		num_indice_ = (UINT)indices.size();
+		num_indice_ = (UINT)num_indice;
 	}
 
 	void StaticMesh::CreateTexture(const std::string& file_path)
@@ -445,37 +416,19 @@ namespace epsilon
 		d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
 	}
 
-	void StaticMesh::PositionElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
+	void StaticMesh::CreateCBuffer()
 	{
-		desc.SemanticName = "POSITION";
-		desc.SemanticIndex = 0;
-		desc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		desc.InputSlot = 0;
-		desc.AlignedByteOffset = 0;
-		desc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		desc.InstanceDataStepRate = 0;
-	}
+		D3D11_BUFFER_DESC cbuffer_desc;
+		cbuffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+		cbuffer_desc.ByteWidth = (std::max)((UINT)16, (UINT)sizeof(VS_CONSTANT_PER_MESH));
+		cbuffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		cbuffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		cbuffer_desc.MiscFlags = 0;
+		cbuffer_desc.StructureByteStride = 0;
 
-	void StaticMesh::NormalElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
-	{
-		desc.SemanticName = "NORMAL";
-		desc.SemanticIndex = 0;
-		desc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		desc.InputSlot = 0;
-		desc.AlignedByteOffset = 0;
-		desc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		desc.InstanceDataStepRate = 0;
-	}
-
-	void StaticMesh::TexCoordElemDesc(D3D11_INPUT_ELEMENT_DESC& desc)
-	{
-		desc.SemanticName = "TEXCOORD";
-		desc.SemanticIndex = 0;
-		desc.Format = DXGI_FORMAT_R32G32_FLOAT;
-		desc.InputSlot = 0;
-		desc.AlignedByteOffset = 0;
-		desc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		desc.InstanceDataStepRate = 0;
+		ID3D11Buffer* d3d_cbuffer = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_desc, NULL, &d3d_cbuffer));
+		d3d_cbuffer_ = MakeCOMPtr(d3d_cbuffer);
 	}
 
 	ID3D11InputLayout* StaticMesh::D3DInputLayout(ShaderObject* so)
@@ -488,10 +441,31 @@ namespace epsilon
 			}
 		}
 
-		std::array<D3D11_INPUT_ELEMENT_DESC, NB_Count> d3d_elems_descs;
-		this->PositionElemDesc(d3d_elems_descs[NB_Position]);
-		this->NormalElemDesc(d3d_elems_descs[NB_Normal]);
-		this->TexCoordElemDesc(d3d_elems_descs[NB_TexCoord]);
+		std::array<D3D11_INPUT_ELEMENT_DESC, 3> d3d_elems_descs;
+
+		d3d_elems_descs[0].SemanticName = "POSITION";
+		d3d_elems_descs[0].SemanticIndex = 0;
+		d3d_elems_descs[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		d3d_elems_descs[0].InputSlot = 0;
+		d3d_elems_descs[0].AlignedByteOffset = 0;
+		d3d_elems_descs[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+		d3d_elems_descs[0].InstanceDataStepRate = 0;
+
+		d3d_elems_descs[1].SemanticName = "NORMAL";
+		d3d_elems_descs[1].SemanticIndex = 0;
+		d3d_elems_descs[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		d3d_elems_descs[1].InputSlot = 0;
+		d3d_elems_descs[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+		d3d_elems_descs[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+		d3d_elems_descs[1].InstanceDataStepRate = 0;
+
+		d3d_elems_descs[2].SemanticName = "TEXCOORD";
+		d3d_elems_descs[2].SemanticIndex = 0;
+		d3d_elems_descs[2].Format = DXGI_FORMAT_R32G32_FLOAT;
+		d3d_elems_descs[2].InputSlot = 0;
+		d3d_elems_descs[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+		d3d_elems_descs[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+		d3d_elems_descs[2].InstanceDataStepRate = 0;
 
 		const std::vector<uint8_t>& vs_code = so->VSCode();
 
@@ -513,14 +487,11 @@ namespace epsilon
 	{
 		this->Destory();
 	}
-	
+
 	void StaticMesh::Destory()
 	{
 		d3d_input_layouts_.clear();
-		for (auto i = d3d_vertex_buffers_.begin(); i != d3d_vertex_buffers_.end(); i++)
-		{
-			(*i).reset();
-		}
+		d3d_vertex_buffer_.reset();
 		d3d_index_buffer_.reset();
 		d3d_tex_res_.reset();
 		d3d_tex_sr_view_.reset();
@@ -528,25 +499,19 @@ namespace epsilon
 
 	void StaticMesh::Bind()
 	{
-		std::array<ID3D11Buffer*, NB_Count> buffers = {
-			d3d_vertex_buffers_[NB_Position].get(),
-			d3d_vertex_buffers_[NB_Normal].get(),
-			d3d_vertex_buffers_[NB_TexCoord].get()
+		std::array<ID3D11Buffer*, 1> buffers = {
+			d3d_vertex_buffer_.get()
 		};
 
-		std::array<UINT, NB_Count> strides = {
-			sizeof(Vector3f),
-			sizeof(Vector3f),
-			sizeof(Vector2f)
+		std::array<UINT, 1> strides = {
+			sizeof(VS_INPUT)
 		};
 
-		std::array<UINT, NB_Count> offsets = {
-			0,
-			0,
+		std::array<UINT, 1> offsets = {
 			0
 		};
 
-		re_->D3DContext()->IASetVertexBuffers(0, NB_Count, buffers.data(), strides.data(), offsets.data());
+		re_->D3DContext()->IASetVertexBuffers(0, 1, buffers.data(), strides.data(), offsets.data());
 
 		re_->D3DContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R16_UINT, 0);
@@ -556,6 +521,16 @@ namespace epsilon
 			ID3D11ShaderResourceView* d3d_sr_view = d3d_tex_sr_view_.get();
 			re_->D3DContext()->PSSetShaderResources(0, 1, &d3d_sr_view);
 		}
+
+		D3D11_MAPPED_SUBRESOURCE mapped_res;
+		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
+
+		VS_CONSTANT_PER_MESH* cbuffer_ptr = (VS_CONSTANT_PER_MESH*)mapped_res.pData;
+		cbuffer_ptr->tex_enabled = !!d3d_tex_sr_view_;
+		re_->D3DContext()->Unmap(d3d_cbuffer_.get(), 0);
+
+		ID3D11Buffer* d3d_cbuffer = d3d_cbuffer_.get();
+		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer);
 	}
 
 	void StaticMesh::Render(ShaderObject* so)
@@ -578,17 +553,17 @@ namespace epsilon
 	}
 
 
-	CBufferObject::CBufferObject()
+	CBufferPerFrame::CBufferPerFrame()
 	{
 		re_ = nullptr;
 	}
 
-	CBufferObject::~CBufferObject()
+	CBufferPerFrame::~CBufferPerFrame()
 	{
 		this->Destory();
 	}
 
-	void CBufferObject::BindVS()
+	void CBufferPerFrame::BindVS()
 	{
 		D3D11_MAPPED_SUBRESOURCE mapped_res;
 		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
@@ -603,7 +578,7 @@ namespace epsilon
 		re_->D3DContext()->VSSetConstantBuffers(0, 1, &d3d_cbuffer);
 	}
 
-	void CBufferObject::BindPS()
+	void CBufferPerFrame::BindPS()
 	{
 		D3D11_MAPPED_SUBRESOURCE mapped_res;
 		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
@@ -618,7 +593,7 @@ namespace epsilon
 		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer);
 	}
 
-	void CBufferObject::Create()
+	void CBufferPerFrame::Create()
 	{
 		D3D11_BUFFER_DESC cbuffer_desc;
 		cbuffer_desc.Usage = D3D11_USAGE_DYNAMIC;
@@ -634,7 +609,7 @@ namespace epsilon
 	}
 
 
-	void CBufferObject::Destory()
+	void CBufferPerFrame::Destory()
 	{
 		d3d_cbuffer_.reset();
 		re_ = nullptr;
@@ -695,11 +670,11 @@ namespace epsilon
 
 		D3D11_SAMPLER_DESC d3d_sampler_desc;
 		d3d_sampler_desc.Filter = D3D11_FILTER_ANISOTROPIC;
-		d3d_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-		d3d_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-		d3d_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+		d3d_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+		d3d_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+		d3d_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 		d3d_sampler_desc.MipLODBias = 0.0f;
-		d3d_sampler_desc.MaxAnisotropy = 1;
+		d3d_sampler_desc.MaxAnisotropy = 8;
 		d3d_sampler_desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
 		d3d_sampler_desc.BorderColor[0] = 0;
 		d3d_sampler_desc.BorderColor[1] = 0;
@@ -984,7 +959,7 @@ namespace epsilon
 		so_ = so;
 	}
 
-	void RenderEngine::SetCBufferObject(CBufferObjectPtr cb)
+	void RenderEngine::SetCBufferPerFrame(CBufferPerFramePtr cb)
 	{
 		cb_ = cb;
 	}
@@ -996,7 +971,7 @@ namespace epsilon
 
 	void RenderEngine::Frame()
 	{
-		float clean_color[4] = {0.2f, 0.2f, 0.6f, 1};
+		float clean_color[4] = { 0.2f, 0.2f, 0.6f, 1 };
 		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
 		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 

@@ -3,8 +3,15 @@
 
 #include "stdafx.h"
 #include "AllInOne.h"
+#include <filesystem>
+#include <assimp\config.h>
+#include <assimp\cimport.h>
+#include <assimp\postprocess.h>
+#include <assimp\scene.h>
+
 
 using namespace epsilon;
+
 
 void GenerateCube(StaticMeshPtr r)
 {
@@ -27,7 +34,10 @@ void GenerateCube(StaticMeshPtr r)
 	auto draw_plane = [&](int a, int b, int c, int d) {
 		Vector3f p1 = verts[a], p2 = verts[b], p3 = verts[c], p4 = verts[d];
 		Vector3f norm = CrossProduct3((p3 - p2), (p1 - p2));
-		Vector2f tc1(0, 0), tc2(0, 1), tc3(1, 1), tc4(1, 0);
+
+		float uv1 = 0.1f;
+		float uv2 = 0.9f;
+		Vector2f tc1(uv1, uv1), tc2(uv1, uv2), tc3(uv2, uv2), tc4(uv2, uv1);
 
 		uint16_t index = (uint16_t)positions.size();
 		positions.push_back(p1);
@@ -61,10 +71,94 @@ void GenerateCube(StaticMeshPtr r)
 	draw_plane(2, 3, 7, 6);
 	draw_plane(0, 4, 7, 3);
 
-	r->CreatePositionBuffer(positions);
-	r->CreateNormalBuffer(normals);
-	r->CreateTexCoordBuffer(texcoords);
-	r->CreateIndexBuffer(indices);
+	r->CreateVertexBuffer(positions.size(), positions.data(), normals.data(), texcoords.data());
+	r->CreateIndexBuffer(indices.size(), indices.data());
+}
+
+
+void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
+{
+	aiPropertyStore* props = aiCreatePropertyStore();
+	aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_TER_MAKE_UVS, 1);
+	aiSetImportPropertyFloat(props, AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 80);
+	aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, 0);
+	aiSetImportPropertyInteger(props, AI_CONFIG_GLOB_MEASURE_TIME, 1);
+
+	unsigned int ppsteps = aiProcess_JoinIdenticalVertices // join identical vertices/ optimize indexing
+		| aiProcess_ValidateDataStructure // perform a full validation of the loader's output
+		| aiProcess_RemoveRedundantMaterials // remove redundant materials
+		| aiProcess_FindInstances; // search for instanced meshes and remove them by references to one master
+
+	aiScene const * scene = aiImportFileExWithProperties(file_path.c_str(),
+		ppsteps // configurable pp steps
+		| aiProcess_GenSmoothNormals // generate smooth normal vectors if not existing
+		| aiProcess_Triangulate // triangulate polygons with more than 3 edges
+		| aiProcess_ConvertToLeftHanded // convert everything to D3D left handed space
+		| aiProcess_FixInfacingNormals, // find normals facing inwards and inverts them
+		nullptr, props);
+
+	auto pp = _FSPFX path(file_path).parent_path();
+
+	for (unsigned int mi = 0; mi < scene->mNumMeshes; ++mi)
+	{
+		aiMesh const * mesh = scene->mMeshes[mi];
+
+		std::string tex_path;
+		std::vector<Vector3f> pos_data;
+		std::vector<Vector3f> norm_data;
+		std::vector<Vector2f> tc_data;
+		std::vector<uint16_t> indice_data;
+		size_t num_vert = mesh->mNumVertices;
+
+		auto mtl = scene->mMaterials[mesh->mMaterialIndex];
+		unsigned int count = aiGetMaterialTextureCount(mtl, aiTextureType_DIFFUSE);
+		if (count > 0)
+		{
+			aiString str;
+			aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &str, 0, 0, 0, 0, 0, 0);
+			pp.append("/").append(str.C_Str());
+			tex_path = pp.string();
+		}
+
+		for (unsigned int fi = 0; fi < mesh->mNumFaces; ++fi)
+		{
+			if (3 == mesh->mFaces[fi].mNumIndices)
+			{
+				indice_data.push_back(mesh->mFaces[fi].mIndices[0]);
+				indice_data.push_back(mesh->mFaces[fi].mIndices[1]);
+				indice_data.push_back(mesh->mFaces[fi].mIndices[2]);
+			}
+		}
+
+		pos_data.resize(num_vert);
+		norm_data.resize(num_vert);
+		tc_data.resize(num_vert);
+		for (unsigned int vi = 0; vi < mesh->mNumVertices; ++vi)
+		{
+			pos_data[vi] = Vector3f(&mesh->mVertices[vi].x);
+
+			if (mesh->mNormals)
+			{
+				norm_data[vi] = Vector3f(&mesh->mNormals[vi].x);
+			}
+
+			if (mesh->mTextureCoords && mesh->mTextureCoords[0])
+			{
+				tc_data[vi] = Vector2f(&mesh->mTextureCoords[0][vi].x);
+			}
+		}
+
+		StaticMeshPtr r = re.MakeObject<StaticMesh>();
+		r->CreateCBuffer();
+		r->CreateVertexBuffer(num_vert, pos_data.data(), norm_data.data(), tc_data.data());
+		r->CreateIndexBuffer(indice_data.size(), indice_data.data());
+		if (!tex_path.empty())
+		{
+			r->CreateTexture(tex_path);
+		}
+		re.AddRenderable(r);
+	}
+
 }
 
 
@@ -80,22 +174,19 @@ int main()
 
 		RenderEngine& re = app.RE();
 
-		CBufferObjectPtr cb = re.MakeObject<CBufferObject>();
+		CBufferPerFramePtr cb = re.MakeObject<CBufferPerFrame>();
 		cb->Create();
-		Vector3f eye(0, -1.5, 2.0f), at(0, 0, 0), up(0, 0, 1);
+		Vector3f eye(0, 2, -3), at(0, 0, 0), up(0, 1, 0);
 		cb->camera_.LookAt(eye, at, up);
 		cb->camera_.Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
-		re.SetCBufferObject(cb);
+		re.SetCBufferPerFrame(cb);
 
 		ShaderObjectPtr so = re.MakeObject<ShaderObject>();
 		so->CreateVS("../../../Media/Shader/VertexShader.hlsl", "main");
 		so->CreatePS("../../../Media/Shader/PixelShader.hlsl", "main");
 		re.SetShaderObject(so);
 
-		StaticMeshPtr r = re.MakeObject<StaticMesh>();
-		GenerateCube(r);
-		r->CreateTexture("../../../Media/Texture/spnza_bricks_a_diff.dds");
-		re.AddRenderable(r);
+		LoadAssimpStaticMesh(re, "../../../Media/Model/Cup/cup.obj");
 
 		app.Run();
 	}
