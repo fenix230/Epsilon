@@ -1,10 +1,7 @@
-cbuffer PS_CBUFFER_PER_MODEL
+cbuffer PS_CBUFFER
 {
-	bool tex_enabled;
+	int tex_enabled;
 };
-
-Texture2D tex;
-SamplerState sampler_stat;
 
 struct PS_INPUT
 {
@@ -14,10 +11,13 @@ struct PS_INPUT
 };
 
 
+Texture2D tex;
+SamplerState sampler_stat;
+
 float4 main(PS_INPUT input) : SV_TARGET
 {
 	float4 output_color = float4(1, 1, 1, 0);
-	if (tex_enabled)
+	if (tex_enabled == 1)
 	{
 		output_color = tex.Sample(sampler_stat, input.tc);
 	}

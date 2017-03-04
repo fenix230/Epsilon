@@ -416,19 +416,37 @@ namespace epsilon
 		d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
 	}
 
+	template<class T>
+	struct CBufferByteWidth
+	{
+		static const UINT value = (sizeof(T) / 16 + 1) * 16;
+	};
+
 	void StaticMesh::CreateCBuffer()
 	{
-		D3D11_BUFFER_DESC cbuffer_desc;
-		cbuffer_desc.Usage = D3D11_USAGE_DYNAMIC;
-		cbuffer_desc.ByteWidth = (std::max)((UINT)16, (UINT)sizeof(VS_CONSTANT_PER_MESH));
-		cbuffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbuffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		cbuffer_desc.MiscFlags = 0;
-		cbuffer_desc.StructureByteStride = 0;
+		D3D11_BUFFER_DESC cbuffer_vs_desc;
+		cbuffer_vs_desc.Usage = D3D11_USAGE_DYNAMIC;
+		cbuffer_vs_desc.ByteWidth = CBufferByteWidth<VS_CONSTANT>::value;
+		cbuffer_vs_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		cbuffer_vs_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		cbuffer_vs_desc.MiscFlags = 0;
+		cbuffer_vs_desc.StructureByteStride = 0;
 
-		ID3D11Buffer* d3d_cbuffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_desc, NULL, &d3d_cbuffer));
-		d3d_cbuffer_ = MakeCOMPtr(d3d_cbuffer);
+		ID3D11Buffer* d3d_cbuffer_vs = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_vs_desc, NULL, &d3d_cbuffer_vs));
+		d3d_cbuffer_vs_ = MakeCOMPtr(d3d_cbuffer_vs);
+
+		D3D11_BUFFER_DESC cbuffer_ps_desc;
+		cbuffer_ps_desc.Usage = D3D11_USAGE_DYNAMIC;
+		cbuffer_ps_desc.ByteWidth = CBufferByteWidth<VS_CONSTANT>::value;
+		cbuffer_ps_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		cbuffer_ps_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		cbuffer_ps_desc.MiscFlags = 0;
+		cbuffer_ps_desc.StructureByteStride = 0;
+
+		ID3D11Buffer* d3d_cbuffer_ps = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_ps_desc, NULL, &d3d_cbuffer_ps));
+		d3d_cbuffer_ps_ = MakeCOMPtr(d3d_cbuffer_ps);
 	}
 
 	ID3D11InputLayout* StaticMesh::D3DInputLayout(ShaderObject* so)
@@ -495,10 +513,37 @@ namespace epsilon
 		d3d_index_buffer_.reset();
 		d3d_tex_res_.reset();
 		d3d_tex_sr_view_.reset();
+		d3d_cbuffer_vs_.reset();
+		d3d_cbuffer_ps_.reset();
 	}
 
-	void StaticMesh::Bind()
+	void StaticMesh::Bind(Camera* cam)
 	{
+		//VS constant buffer
+		D3D11_MAPPED_SUBRESOURCE mapped_res_vs;
+		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_vs_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res_vs));
+
+		VS_CONSTANT* cbuffer_vs_ptr = (VS_CONSTANT*)mapped_res_vs.pData;
+		cbuffer_vs_ptr->world = XMMatrixTranspose(cam->world);
+		cbuffer_vs_ptr->view = XMMatrixTranspose(cam->view);
+		cbuffer_vs_ptr->proj = XMMatrixTranspose(cam->proj);
+		re_->D3DContext()->Unmap(d3d_cbuffer_vs_.get(), 0);
+
+		ID3D11Buffer* d3d_cbuffer_vs = d3d_cbuffer_vs_.get();
+		re_->D3DContext()->VSSetConstantBuffers(0, 1, &d3d_cbuffer_vs);
+
+		//PS constant buffer
+		D3D11_MAPPED_SUBRESOURCE mapped_res_ps;
+		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_ps_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res_ps));
+
+		PS_CONSTANT* cbuffer_ps_ptr = (PS_CONSTANT*)mapped_res_ps.pData;
+		cbuffer_ps_ptr->tex_enabled = (!d3d_tex_sr_view_ ? 0 : 1);
+		re_->D3DContext()->Unmap(d3d_cbuffer_ps_.get(), 0);
+
+		ID3D11Buffer* d3d_cbuffer_ps = d3d_cbuffer_ps_.get();
+		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer_ps);
+
+		//Vertex buffer and index buffer
 		std::array<ID3D11Buffer*, 1> buffers = {
 			d3d_vertex_buffer_.get()
 		};
@@ -515,22 +560,13 @@ namespace epsilon
 
 		re_->D3DContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R16_UINT, 0);
-
+		
+		//Shader resource view
 		if (d3d_tex_sr_view_)
 		{
 			ID3D11ShaderResourceView* d3d_sr_view = d3d_tex_sr_view_.get();
 			re_->D3DContext()->PSSetShaderResources(0, 1, &d3d_sr_view);
 		}
-
-		D3D11_MAPPED_SUBRESOURCE mapped_res;
-		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
-
-		VS_CONSTANT_PER_MESH* cbuffer_ptr = (VS_CONSTANT_PER_MESH*)mapped_res.pData;
-		cbuffer_ptr->tex_enabled = !!d3d_tex_sr_view_;
-		re_->D3DContext()->Unmap(d3d_cbuffer_.get(), 0);
-
-		ID3D11Buffer* d3d_cbuffer = d3d_cbuffer_.get();
-		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer);
 	}
 
 	void StaticMesh::Render(ShaderObject* so)
@@ -552,68 +588,6 @@ namespace epsilon
 		proj = XMMatrixPerspectiveFovLH(ang, aspect, near_plane, far_plane);
 	}
 
-
-	CBufferPerFrame::CBufferPerFrame()
-	{
-		re_ = nullptr;
-	}
-
-	CBufferPerFrame::~CBufferPerFrame()
-	{
-		this->Destory();
-	}
-
-	void CBufferPerFrame::BindVS()
-	{
-		D3D11_MAPPED_SUBRESOURCE mapped_res;
-		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
-
-		Matrix* cbuffer_ptr = (Matrix*)mapped_res.pData;
-		cbuffer_ptr[0] = XMMatrixTranspose(camera_.world);
-		cbuffer_ptr[1] = XMMatrixTranspose(camera_.view);
-		cbuffer_ptr[2] = XMMatrixTranspose(camera_.proj);
-		re_->D3DContext()->Unmap(d3d_cbuffer_.get(), 0);
-
-		ID3D11Buffer* d3d_cbuffer = d3d_cbuffer_.get();
-		re_->D3DContext()->VSSetConstantBuffers(0, 1, &d3d_cbuffer);
-	}
-
-	void CBufferPerFrame::BindPS()
-	{
-		D3D11_MAPPED_SUBRESOURCE mapped_res;
-		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res));
-
-		Matrix* cbuffer_ptr = (Matrix*)mapped_res.pData;
-		cbuffer_ptr[0] = XMMatrixTranspose(camera_.world);
-		cbuffer_ptr[1] = XMMatrixTranspose(camera_.view);
-		cbuffer_ptr[2] = XMMatrixTranspose(camera_.proj);
-		re_->D3DContext()->Unmap(d3d_cbuffer_.get(), 0);
-
-		ID3D11Buffer* d3d_cbuffer = d3d_cbuffer_.get();
-		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer);
-	}
-
-	void CBufferPerFrame::Create()
-	{
-		D3D11_BUFFER_DESC cbuffer_desc;
-		cbuffer_desc.Usage = D3D11_USAGE_DYNAMIC;
-		cbuffer_desc.ByteWidth = sizeof(Matrix) * 3;
-		cbuffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbuffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		cbuffer_desc.MiscFlags = 0;
-		cbuffer_desc.StructureByteStride = 0;
-
-		ID3D11Buffer* d3d_cbuffer = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_desc, NULL, &d3d_cbuffer));
-		d3d_cbuffer_ = MakeCOMPtr(d3d_cbuffer);
-	}
-
-
-	void CBufferPerFrame::Destory()
-	{
-		d3d_cbuffer_.reset();
-		re_ = nullptr;
-	}
 
 	ShaderObject::ShaderObject()
 	{
@@ -928,7 +902,7 @@ namespace epsilon
 	void RenderEngine::Destory()
 	{
 		rs_.clear();
-		cb_.reset();
+		cam_.reset();
 		so_.reset();
 
 		if (gi_swap_chain_1_)
@@ -959,9 +933,9 @@ namespace epsilon
 		so_ = so;
 	}
 
-	void RenderEngine::SetCBufferPerFrame(CBufferPerFramePtr cb)
+	void RenderEngine::SetCamera(CameraPtr cam)
 	{
-		cb_ = cb;
+		cam_ = cam;
 	}
 
 	void RenderEngine::AddRenderable(RenderablePtr r)
@@ -975,13 +949,10 @@ namespace epsilon
 		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
 		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-		cb_->BindVS();
-		cb_->BindPS();
-
 		for (auto i = rs_.begin(); i != rs_.end(); i++)
 		{
 			RenderablePtr r = *i;
-			r->Bind();
+			r->Bind(cam_.get());
 			r->Render(so_.get());
 		}
 

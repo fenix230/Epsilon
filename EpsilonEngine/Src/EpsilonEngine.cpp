@@ -174,12 +174,11 @@ int main()
 
 		RenderEngine& re = app.RE();
 
-		CBufferPerFramePtr cb = re.MakeObject<CBufferPerFrame>();
-		cb->Create();
+		CameraPtr cam = std::make_shared<Camera>();
 		Vector3f eye(0, 2, -3), at(0, 0, 0), up(0, 1, 0);
-		cb->camera_.LookAt(eye, at, up);
-		cb->camera_.Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
-		re.SetCBufferPerFrame(cb);
+		cam->LookAt(eye, at, up);
+		cam->Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
+		re.SetCamera(cam);
 
 		ShaderObjectPtr so = re.MakeObject<ShaderObject>();
 		so->CreateVS("../../../Media/Shader/VertexShader.hlsl", "main");

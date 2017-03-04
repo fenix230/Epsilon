@@ -1,4 +1,4 @@
-cbuffer VS_CBUFFER_PER_FRAME
+cbuffer VS_CBUFFER
 {
 	matrix world_mat;
 	matrix view_mat;

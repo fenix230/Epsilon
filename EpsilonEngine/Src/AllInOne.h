@@ -301,6 +301,7 @@ namespace epsilon
 	DEFINE_SMART_POINTER(ShaderObject);
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
+	DEFINE_SMART_POINTER(Camera);
 
 
 	struct REObject
@@ -314,8 +315,9 @@ namespace epsilon
 	};
 
 
-	struct Camera
+	class Camera
 	{
+	public:
 		void LookAt(Vector3f pos, Vector3f target, Vector3f up);
 
 		void Perspective(float ang, float aspect, float near_plane, float far_plane);
@@ -323,25 +325,6 @@ namespace epsilon
 		Matrix world;
 		Matrix view;
 		Matrix proj;
-	};
-
-
-	class CBufferPerFrame : public REObject
-	{
-	public:
-		CBufferPerFrame();
-		virtual ~CBufferPerFrame();
-
-		void Create();
-		void Destory();
-
-		void BindVS();
-		void BindPS();
-		
-		Camera camera_;
-
-	private:
-		ID3D11BufferPtr d3d_cbuffer_;
 	};
 
 
@@ -370,7 +353,7 @@ namespace epsilon
 	class Renderable : public REObject
 	{
 	public:
-		virtual void Bind() = 0;
+		virtual void Bind(Camera* cam) = 0;
 		virtual void Render(ShaderObject* so) = 0;
 	};
 
@@ -381,7 +364,7 @@ namespace epsilon
 		StaticMesh();
 		virtual ~StaticMesh();
 
-		virtual void Bind() override;
+		virtual void Bind(Camera* cam) override;
 		virtual void Render(ShaderObject* so) override;
 
 		void CreateVertexBuffer(size_t num_vert, 
@@ -405,9 +388,16 @@ namespace epsilon
 			Vector2f tc;
 		};
 
-		struct VS_CONSTANT_PER_MESH
+		struct VS_CONSTANT
 		{
-			bool tex_enabled;
+			Matrix world;
+			Matrix view;
+			Matrix proj;
+		};
+
+		struct PS_CONSTANT
+		{
+			int tex_enabled;
 		};
 
 		ID3D11BufferPtr d3d_vertex_buffer_;
@@ -420,7 +410,8 @@ namespace epsilon
 		ID3D11ResourcePtr d3d_tex_res_;
 		ID3D11ShaderResourceViewPtr d3d_tex_sr_view_;
 
-		ID3D11BufferPtr d3d_cbuffer_;
+		ID3D11BufferPtr d3d_cbuffer_vs_;
+		ID3D11BufferPtr d3d_cbuffer_ps_;
 	};
 
 
@@ -435,7 +426,7 @@ namespace epsilon
 
 		void SetShaderObject(ShaderObjectPtr so);
 
-		void SetCBufferPerFrame(CBufferPerFramePtr cb);
+		void SetCamera(CameraPtr cam);
 
 		void AddRenderable(RenderablePtr r);
 
@@ -490,7 +481,7 @@ namespace epsilon
 		ID3D11RasterizerStatePtr d3d_raster_state_;
 
 		ShaderObjectPtr so_;
-		CBufferPerFramePtr cb_;
+		CameraPtr cam_;
 		std::vector<RenderablePtr> rs_;
 	};
 
