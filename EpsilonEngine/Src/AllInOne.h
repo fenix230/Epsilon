@@ -11,6 +11,7 @@
 #include <vector>
 #include <d3dcompiler.h>
 #include <array>
+#include <d3dx11effect.h>
 
 
 namespace epsilon
@@ -221,7 +222,7 @@ namespace epsilon
 	typedef std::shared_ptr<ID3D11BlendState1>			ID3D11BlendState1Ptr;
 	typedef std::shared_ptr<ID3D11SamplerState>			ID3D11SamplerStatePtr;
 	typedef std::shared_ptr<ID3D11ShaderResourceView>	ID3D11ShaderResourceViewPtr;
-
+	typedef std::shared_ptr<ID3DX11Effect>				ID3DX11EffectPtr;
 
 	class Window
 	{
@@ -298,9 +299,10 @@ namespace epsilon
 
 	class RenderEngine;
 	DEFINE_SMART_POINTER(CBufferPerFrame);
-	DEFINE_SMART_POINTER(ShaderObject);
+	//DEFINE_SMART_POINTER(ShaderObject);
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
+	DEFINE_SMART_POINTER(EffectObject);
 	DEFINE_SMART_POINTER(Camera);
 
 
@@ -318,6 +320,8 @@ namespace epsilon
 	class Camera
 	{
 	public:
+		void Bind(ID3DX11Effect* effect);
+
 		void LookAt(Vector3f pos, Vector3f target, Vector3f up);
 
 		void Perspective(float ang, float aspect, float near_plane, float far_plane);
@@ -332,33 +336,10 @@ namespace epsilon
 	};
 
 
-	class ShaderObject : public REObject
-	{
-	public:
-		ShaderObject();
-		virtual ~ShaderObject();
-
-		void CreateVS(std::string file_path, std::string entry_point);
-		void CreatePS(std::string file_path, std::string entry_point);
-		void Destory();
-
-		void Bind();
-
-		const std::vector<uint8_t>& VSCode();
-
-	private:
-		ID3D11VertexShaderPtr d3d_vs_;
-		ID3D11PixelShaderPtr d3d_ps_;
-		ID3D11SamplerStatePtr d3d_sampler_state_;
-		std::vector<uint8_t> vs_code_;
-	};
-
-
 	class Renderable : public REObject
 	{
 	public:
-		virtual void Bind(Camera* cam, const Vector3f& light_dir) = 0;
-		virtual void Render(ShaderObject* so) = 0;
+		virtual void Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass) = 0;
 	};
 
 
@@ -368,21 +349,19 @@ namespace epsilon
 		StaticMesh();
 		virtual ~StaticMesh();
 
-		virtual void Bind(Camera* cam, const Vector3f& light_dir) override;
-		virtual void Render(ShaderObject* so) override;
+		virtual void Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass) override;
 
 		void CreateVertexBuffer(size_t num_vert, 
 			const Vector3f* pos_data, 
 			const Vector3f* norm_data, 
 			const Vector2f* tc_data);
-		void CreateIndexBuffer(size_t num_indice, const uint16_t* data);
+		void CreateIndexBuffer(size_t num_indice, const uint32_t* data);
 		void CreateMaterial(std::string file_path, Vector3f ka, Vector3f kd, Vector3f ks);
-		void CreateCBuffer();
 
 		void Destory();
 
 	private:
-		ID3D11InputLayout* D3DInputLayout(ShaderObject* so);
+		ID3D11InputLayout* D3DInputLayout(ID3DX11EffectPass* pass);
 
 	private:
 		struct VS_INPUT
@@ -392,36 +371,15 @@ namespace epsilon
 			Vector2f tc;
 		};
 
-		struct VS_CONSTANT
-		{
-			Matrix world;
-			Matrix view;
-			Matrix proj;
-			Vector4f light_dir;
-			Vector4f eye_pos;
-		};
-
-		struct PS_CONSTANT
-		{
-			Vector4f light_dir;
-			Vector4f ka;
-			Vector4f kd;
-			Vector4f ks;
-			int tex_enabled;
-		};
-
 		ID3D11BufferPtr d3d_vertex_buffer_;
 		ID3D11BufferPtr d3d_index_buffer_;
 
 		UINT num_indice_;
 
-		std::vector<std::pair<ShaderObject*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
+		std::vector<std::pair<ID3DX11EffectPass*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
 
 		ID3D11ResourcePtr d3d_tex_res_;
 		ID3D11ShaderResourceViewPtr d3d_tex_sr_view_;
-
-		ID3D11BufferPtr d3d_cbuffer_vs_;
-		ID3D11BufferPtr d3d_cbuffer_ps_;
 
 		Vector3f ka_, kd_, ks_;
 	};
@@ -436,7 +394,7 @@ namespace epsilon
 		void Create(HWND wnd, int width, int height);
 		void Destory();
 
-		void SetShaderObject(ShaderObjectPtr so);
+		void LoadEffect(std::string file_path);
 
 		void SetCamera(CameraPtr cam);
 
@@ -492,7 +450,8 @@ namespace epsilon
 		ID3D11DepthStencilViewPtr d3d_depth_stencil_view_;
 		ID3D11RasterizerStatePtr d3d_raster_state_;
 
-		ShaderObjectPtr so_;
+		ID3DX11EffectPtr d3d_effect_;
+
 		CameraPtr cam_;
 		std::vector<RenderablePtr> rs_;
 	};

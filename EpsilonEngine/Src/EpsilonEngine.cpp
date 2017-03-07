@@ -29,7 +29,7 @@ void GenerateCube(StaticMeshPtr r)
 	std::vector<Vector3f> positions;
 	std::vector<Vector3f> normals;
 	std::vector<Vector2f> texcoords;
-	std::vector<uint16_t> indices;
+	std::vector<uint32_t> indices;
 
 	auto draw_plane = [&](int a, int b, int c, int d) {
 		Vector3f p1 = verts[a], p2 = verts[b], p3 = verts[c], p4 = verts[d];
@@ -39,7 +39,7 @@ void GenerateCube(StaticMeshPtr r)
 		float uv2 = 0.9f;
 		Vector2f tc1(uv1, uv1), tc2(uv1, uv2), tc3(uv2, uv2), tc4(uv2, uv1);
 
-		uint16_t index = (uint16_t)positions.size();
+		uint32_t index = (uint32_t)positions.size();
 		positions.push_back(p1);
 		positions.push_back(p2);
 		positions.push_back(p3);
@@ -51,7 +51,7 @@ void GenerateCube(StaticMeshPtr r)
 		indices.push_back(index + 1);
 		indices.push_back(index + 2);
 
-		index = (uint16_t)positions.size();
+		index = (uint32_t)positions.size();
 		positions.push_back(p3);
 		positions.push_back(p4);
 		positions.push_back(p1);
@@ -110,7 +110,7 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		std::vector<Vector3f> pos_data;
 		std::vector<Vector3f> norm_data;
 		std::vector<Vector2f> tc_data;
-		std::vector<uint16_t> indice_data;
+		std::vector<uint32_t> indice_data;
 		size_t num_vert = mesh->mNumVertices;
 
 		auto mtl = scene->mMaterials[mesh->mMaterialIndex];
@@ -166,7 +166,6 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		}
 
 		StaticMeshPtr r = re.MakeObject<StaticMesh>();
-		r->CreateCBuffer();
 		r->CreateVertexBuffer(num_vert, pos_data.data(), norm_data.data(), tc_data.data());
 		r->CreateIndexBuffer(indice_data.size(), indice_data.data());
 		r->CreateMaterial(tex_path, ka, kd, ks);
@@ -188,16 +187,13 @@ int main()
 
 		RenderEngine& re = app.RE();
 
+		re.LoadEffect("../../../Media/Effect/Shading.fx");
+
 		CameraPtr cam = std::make_shared<Camera>();
 		Vector3f eye(0, 2, -3), at(0, 0, 0), up(0, 1, 0);
 		cam->LookAt(eye, at, up);
 		cam->Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
 		re.SetCamera(cam);
-
-		ShaderObjectPtr so = re.MakeObject<ShaderObject>();
-		so->CreateVS("../../../Media/Shader/VertexShader.hlsl", "main");
-		so->CreatePS("../../../Media/Shader/PixelShader.hlsl", "main");
-		re.SetShaderObject(so);
 
 		LoadAssimpStaticMesh(re, "../../../Media/Model/Cup/cup.obj");
 

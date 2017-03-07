@@ -383,11 +383,11 @@ namespace epsilon
 		d3d_vertex_buffer_ = MakeCOMPtr(d3d_buffer);
 	}
 
-	void StaticMesh::CreateIndexBuffer(size_t num_indice, const uint16_t* data)
+	void StaticMesh::CreateIndexBuffer(size_t num_indice, const uint32_t* data)
 	{
 		D3D11_BUFFER_DESC buffer_desc;
 		buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		buffer_desc.ByteWidth = sizeof(uint16_t) * (UINT)num_indice;
+		buffer_desc.ByteWidth = sizeof(uint32_t) * (UINT)num_indice;
 		buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 		buffer_desc.CPUAccessFlags = 0;
 		buffer_desc.MiscFlags = 0;
@@ -423,82 +423,32 @@ namespace epsilon
 		ks_ = ks;
 	}
 
-	template<class T>
-	struct CBufferByteWidth
-	{
-		static const UINT value = (sizeof(T) / 16 + 1) * 16;
-	};
 
-	void StaticMesh::CreateCBuffer()
-	{
-		D3D11_BUFFER_DESC cbuffer_vs_desc;
-		cbuffer_vs_desc.Usage = D3D11_USAGE_DYNAMIC;
-		cbuffer_vs_desc.ByteWidth = CBufferByteWidth<VS_CONSTANT>::value;
-		cbuffer_vs_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbuffer_vs_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		cbuffer_vs_desc.MiscFlags = 0;
-		cbuffer_vs_desc.StructureByteStride = 0;
-
-		ID3D11Buffer* d3d_cbuffer_vs = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_vs_desc, NULL, &d3d_cbuffer_vs));
-		d3d_cbuffer_vs_ = MakeCOMPtr(d3d_cbuffer_vs);
-
-		D3D11_BUFFER_DESC cbuffer_ps_desc;
-		cbuffer_ps_desc.Usage = D3D11_USAGE_DYNAMIC;
-		cbuffer_ps_desc.ByteWidth = CBufferByteWidth<PS_CONSTANT>::value;
-		cbuffer_ps_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		cbuffer_ps_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		cbuffer_ps_desc.MiscFlags = 0;
-		cbuffer_ps_desc.StructureByteStride = 0;
-
-		ID3D11Buffer* d3d_cbuffer_ps = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateBuffer(&cbuffer_ps_desc, NULL, &d3d_cbuffer_ps));
-		d3d_cbuffer_ps_ = MakeCOMPtr(d3d_cbuffer_ps);
-	}
-
-	ID3D11InputLayout* StaticMesh::D3DInputLayout(ShaderObject* so)
+	ID3D11InputLayout* StaticMesh::D3DInputLayout(ID3DX11EffectPass* pass)
 	{
 		for (auto i = d3d_input_layouts_.begin(); i != d3d_input_layouts_.end(); i++)
 		{
-			if (i->first == so)
+			if (i->first == pass)
 			{
 				return i->second.get();
 			}
 		}
 
-		std::array<D3D11_INPUT_ELEMENT_DESC, 3> d3d_elems_descs;
+		const D3D11_INPUT_ELEMENT_DESC d3d_elems_descs[] =
+		{
+			{ "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		};
 
-		d3d_elems_descs[0].SemanticName = "POSITION";
-		d3d_elems_descs[0].SemanticIndex = 0;
-		d3d_elems_descs[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		d3d_elems_descs[0].InputSlot = 0;
-		d3d_elems_descs[0].AlignedByteOffset = 0;
-		d3d_elems_descs[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		d3d_elems_descs[0].InstanceDataStepRate = 0;
-
-		d3d_elems_descs[1].SemanticName = "NORMAL";
-		d3d_elems_descs[1].SemanticIndex = 0;
-		d3d_elems_descs[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		d3d_elems_descs[1].InputSlot = 0;
-		d3d_elems_descs[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-		d3d_elems_descs[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		d3d_elems_descs[1].InstanceDataStepRate = 0;
-
-		d3d_elems_descs[2].SemanticName = "TEXCOORD";
-		d3d_elems_descs[2].SemanticIndex = 0;
-		d3d_elems_descs[2].Format = DXGI_FORMAT_R32G32_FLOAT;
-		d3d_elems_descs[2].InputSlot = 0;
-		d3d_elems_descs[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-		d3d_elems_descs[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		d3d_elems_descs[2].InstanceDataStepRate = 0;
-
-		const std::vector<uint8_t>& vs_code = so->VSCode();
+		D3DX11_PASS_DESC pass_desc;
+		THROW_FAILED(pass->GetDesc(&pass_desc));
 
 		ID3D11InputLayout* d3d_input_layout = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateInputLayout(d3d_elems_descs.data(), (UINT)d3d_elems_descs.size(),
-			&vs_code[0], vs_code.size(), &d3d_input_layout));
+		THROW_FAILED(re_->D3DDevice()->CreateInputLayout(d3d_elems_descs, (UINT)std::size(d3d_elems_descs),
+			pass_desc.pIAInputSignature, pass_desc.IAInputSignatureSize, &d3d_input_layout));
 
-		d3d_input_layouts_.emplace_back(so, MakeCOMPtr(d3d_input_layout));
+		d3d_input_layouts_.emplace_back(pass, MakeCOMPtr(d3d_input_layout));
 
 		return d3d_input_layout;
 	}
@@ -520,41 +470,36 @@ namespace epsilon
 		d3d_index_buffer_.reset();
 		d3d_tex_res_.reset();
 		d3d_tex_sr_view_.reset();
-		d3d_cbuffer_vs_.reset();
-		d3d_cbuffer_ps_.reset();
 	}
 
-	void StaticMesh::Bind(Camera* cam, const Vector3f& light_dir)
+
+	void StaticMesh::Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass)
 	{
-		//VS constant buffer
-		D3D11_MAPPED_SUBRESOURCE mapped_res_vs;
-		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_vs_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res_vs));
+		//Shader resource view
+		if (d3d_tex_sr_view_)
+		{
+			auto var_g_tex = effect->GetVariableByName("g_tex")->AsShaderResource();
+			var_g_tex->SetResource(d3d_tex_sr_view_.get());
 
-		VS_CONSTANT* cbuffer_vs_ptr = (VS_CONSTANT*)mapped_res_vs.pData;
-		cbuffer_vs_ptr->world = XMMatrixTranspose(cam->world_);
-		cbuffer_vs_ptr->view = XMMatrixTranspose(cam->view_);
-		cbuffer_vs_ptr->proj = XMMatrixTranspose(cam->proj_);
-		cbuffer_vs_ptr->light_dir = Vector4f(light_dir.x, light_dir.y, light_dir.z, 0);
-		cbuffer_vs_ptr->eye_pos = Vector4f(cam->eye_pos_.x, cam->eye_pos_.y, cam->eye_pos_.z, 0);
-		re_->D3DContext()->Unmap(d3d_cbuffer_vs_.get(), 0);
+			auto var_g_tex_enabled = effect->GetVariableByName("g_tex_enabled")->AsScalar();
+			var_g_tex_enabled->SetBool(true);
+		}
+		else
+		{
+			auto var_g_tex_enabled = effect->GetVariableByName("g_tex_enabled")->AsScalar();
+			var_g_tex_enabled->SetBool(false);
+		}
 
-		ID3D11Buffer* d3d_cbuffer_vs = d3d_cbuffer_vs_.get();
-		re_->D3DContext()->VSSetConstantBuffers(0, 1, &d3d_cbuffer_vs);
-
-		//PS constant buffer
-		D3D11_MAPPED_SUBRESOURCE mapped_res_ps;
-		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_ps_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res_ps));
-
-		PS_CONSTANT* cbuffer_ps_ptr = (PS_CONSTANT*)mapped_res_ps.pData;
-		cbuffer_ps_ptr->tex_enabled = (!d3d_tex_sr_view_ ? 0 : 1);
-		cbuffer_ps_ptr->light_dir = Vector4f(light_dir.x, light_dir.y, light_dir.z, 0);
-		cbuffer_ps_ptr->ka = Vector4f(ka_.x, ka_.y, ka_.z, 0);
-		cbuffer_ps_ptr->kd = Vector4f(kd_.x, kd_.y, kd_.z, 0);
-		cbuffer_ps_ptr->ks = Vector4f(ks_.x, ks_.y, ks_.z, 0);
-		re_->D3DContext()->Unmap(d3d_cbuffer_ps_.get(), 0);
-
-		ID3D11Buffer* d3d_cbuffer_ps = d3d_cbuffer_ps_.get();
-		re_->D3DContext()->PSSetConstantBuffers(0, 1, &d3d_cbuffer_ps);
+		//ka¡¢kd¡¢ks
+		auto var_g_ka = effect->GetVariableByName("g_ka")->AsVector();
+		auto var_g_kd = effect->GetVariableByName("g_kd")->AsVector();
+		auto var_g_ks = effect->GetVariableByName("g_ks")->AsVector();
+		Vector4f v4 = Vector4f(ka_.x, ka_.y, ka_.z, 0);
+		var_g_ka->SetFloatVector((float*)&v4);
+		v4 = Vector4f(kd_.x, kd_.y, kd_.z, 0);
+		var_g_kd->SetFloatVector((float*)&v4);
+		v4 = Vector4f(ks_.x, ks_.y, ks_.z, 0);
+		var_g_ks->SetFloatVector((float*)&v4);
 
 		//Vertex buffer and index buffer
 		std::array<ID3D11Buffer*, 1> buffers = {
@@ -572,23 +517,27 @@ namespace epsilon
 		re_->D3DContext()->IASetVertexBuffers(0, 1, buffers.data(), strides.data(), offsets.data());
 
 		re_->D3DContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R16_UINT, 0);
-		
-		//Shader resource view
-		if (d3d_tex_sr_view_)
-		{
-			ID3D11ShaderResourceView* d3d_sr_view = d3d_tex_sr_view_.get();
-			re_->D3DContext()->PSSetShaderResources(0, 1, &d3d_sr_view);
-		}
-	}
+		re_->D3DContext()->IASetIndexBuffer(d3d_index_buffer_.get(), DXGI_FORMAT_R32_UINT, 0);
 
-	void StaticMesh::Render(ShaderObject* so)
-	{
-		re_->D3DContext()->IASetInputLayout(this->D3DInputLayout(so));
+		re_->D3DContext()->IASetInputLayout(this->D3DInputLayout(pass));
 
-		so->Bind();
+		pass->Apply(0, re_->D3DContext());
 
 		re_->D3DContext()->DrawIndexed(num_indice_, 0, 0);
+	}
+
+	void Camera::Bind(ID3DX11Effect* effect)
+	{
+		auto var_g_world_mat = effect->GetVariableByName("g_world_mat")->AsMatrix();
+		auto var_g_view_mat = effect->GetVariableByName("g_view_mat")->AsMatrix();
+		auto var_g_proj_mat = effect->GetVariableByName("g_proj_mat")->AsMatrix();
+		auto var_g_eye_pos = effect->GetVariableByName("g_eye_pos")->AsVector();
+
+		var_g_world_mat->SetMatrix((float*)&world_);
+		var_g_view_mat->SetMatrix((float*)&view_);
+		var_g_proj_mat->SetMatrix((float*)&proj_);
+		Vector4f v4(eye_pos_.x, eye_pos_.y, eye_pos_.z, 0);
+		var_g_eye_pos->SetFloatVector((float*)&v4);
 	}
 
 	void Camera::LookAt(Vector3f pos, Vector3f target, Vector3f up)
@@ -602,102 +551,6 @@ namespace epsilon
 	void Camera::Perspective(float ang, float aspect, float near_plane, float far_plane)
 	{
 		proj_ = XMMatrixPerspectiveFovLH(ang, aspect, near_plane, far_plane);
-	}
-
-
-	ShaderObject::ShaderObject()
-	{
-		re_ = nullptr;
-	}
-
-	ShaderObject::~ShaderObject()
-	{
-		this->Destory();
-	}
-
-	void ShaderObject::CreateVS(std::string file_path, std::string entry_point)
-	{
-		std::string hlsl_text;
-
-		std::ifstream fs(file_path);
-		char c = 0;
-		while (fs.get(c))
-		{
-			hlsl_text.push_back(c);
-		}
-		fs.close();
-
-		std::vector<uint8_t> shader_code;
-		std::string err_msg;
-		THROW_FAILED(re_->D3DCompile(hlsl_text, entry_point.c_str(), "vs_5_0", shader_code, err_msg));
-
-		ID3D11VertexShader* d3d_vs = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateVertexShader(shader_code.data(), shader_code.size(), nullptr, &d3d_vs));
-		d3d_vs_ = MakeCOMPtr(d3d_vs);
-
-		vs_code_ = shader_code;
-	}
-
-	void ShaderObject::CreatePS(std::string file_path, std::string entry_point)
-	{
-		std::string hlsl_text;
-
-		std::ifstream fs(file_path);
-		char c = 0;
-		while (fs.get(c))
-		{
-			hlsl_text.push_back(c);
-		}
-		fs.close();
-
-		std::vector<uint8_t> shader_code;
-		std::string err_msg;
-		THROW_FAILED(re_->D3DCompile(hlsl_text, entry_point.c_str(), "ps_5_0", shader_code, err_msg));
-
-		ID3D11PixelShader* d3d_ps = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreatePixelShader(shader_code.data(), shader_code.size(), nullptr, &d3d_ps));
-		d3d_ps_ = MakeCOMPtr(d3d_ps);
-
-		D3D11_SAMPLER_DESC d3d_sampler_desc;
-		d3d_sampler_desc.Filter = D3D11_FILTER_ANISOTROPIC;
-		d3d_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-		d3d_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-		d3d_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-		d3d_sampler_desc.MipLODBias = 0.0f;
-		d3d_sampler_desc.MaxAnisotropy = 8;
-		d3d_sampler_desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-		d3d_sampler_desc.BorderColor[0] = 0;
-		d3d_sampler_desc.BorderColor[1] = 0;
-		d3d_sampler_desc.BorderColor[2] = 0;
-		d3d_sampler_desc.BorderColor[3] = 0;
-		d3d_sampler_desc.MinLOD = 0;
-		d3d_sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
-
-		ID3D11SamplerState* d3d_sampler_state = nullptr;
-		THROW_FAILED(re_->D3DDevice()->CreateSamplerState(&d3d_sampler_desc, &d3d_sampler_state));
-		d3d_sampler_state_ = MakeCOMPtr(d3d_sampler_state);
-	}
-
-	void ShaderObject::Destory()
-	{
-		d3d_vs_.reset();
-		d3d_ps_.reset();
-		d3d_sampler_state_.reset();
-		re_ = nullptr;
-	}
-
-	const std::vector<uint8_t>& ShaderObject::VSCode()
-	{
-		return vs_code_;
-	}
-
-	void ShaderObject::Bind()
-	{
-		re_->D3DContext()->VSSetShader(d3d_vs_.get(), nullptr, 0);
-		re_->D3DContext()->PSSetShader(d3d_ps_.get(), nullptr, 0);
-
-		ID3D11SamplerState* d3d_sampler_state = d3d_sampler_state_.get();
-		re_->D3DContext()->PSSetSamplers(0, 1, &d3d_sampler_state);
 	}
 
 
@@ -919,13 +772,13 @@ namespace epsilon
 	{
 		rs_.clear();
 		cam_.reset();
-		so_.reset();
 
 		if (gi_swap_chain_1_)
 		{
 			gi_swap_chain_1_->SetFullscreenState(false, nullptr);
 		}
 
+		d3d_effect_.reset();
 		d3d_raster_state_.reset();
 		d3d_depth_stencil_view_.reset();
 		d3d_depth_stencil_state_.reset();
@@ -944,9 +797,15 @@ namespace epsilon
 		::FreeLibrary(mod_dxgi_);
 	}
 
-	void RenderEngine::SetShaderObject(ShaderObjectPtr so)
+	void RenderEngine::LoadEffect(std::string file_path)
 	{
-		so_ = so;
+		std::wstring wfile_path = ToWstring(file_path);
+
+		ID3DX11Effect* d3d_effect = nullptr;
+		ID3DBlob* d3d_error_blob = nullptr;
+		THROW_FAILED(D3DX11CompileEffectFromFile(wfile_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			D3DCOMPILE_ENABLE_STRICTNESS, 0, this->D3DDevice(), &d3d_effect, &d3d_error_blob));
+		d3d_effect_ = MakeCOMPtr(d3d_effect);
 	}
 
 	void RenderEngine::SetCamera(CameraPtr cam)
@@ -965,13 +824,20 @@ namespace epsilon
 		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
 		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-		Vector3f light_dir(-1.0f, -1.0f, 1.0f);
+		cam_->Bind(d3d_effect_.get());
 
-		for (auto i = rs_.begin(); i != rs_.end(); i++)
+		ID3DX11EffectTechnique* tech = d3d_effect_->GetTechniqueByIndex(0);
+		D3DX11_TECHNIQUE_DESC tech_desc;
+		THROW_FAILED(tech->GetDesc(&tech_desc));
+
+		for (uint32_t p = 0; p < tech_desc.Passes; ++p)
 		{
-			RenderablePtr r = *i;
-			r->Bind(cam_.get(), light_dir);
-			r->Render(so_.get());
+			ID3DX11EffectPass* pass = tech->GetPassByIndex(p);
+			for (auto i = rs_.begin(); i != rs_.end(); i++)
+			{
+				RenderablePtr r = *i;
+				r->Render(d3d_effect_.get(), pass);
+			}
 		}
 
 		gi_swap_chain_1_->Present(0, 0);

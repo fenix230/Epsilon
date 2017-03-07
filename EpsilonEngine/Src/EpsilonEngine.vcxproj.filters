@@ -19,6 +19,9 @@
     <Filter Include="源文件\DDSTextureLoader">
       <UniqueIdentifier>{8027f2b3-e227-4b3c-8c2d-6ac7686bd762}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\Effects">
+      <UniqueIdentifier>{e0710852-4e06-4638-8353-ff9b4ba37d54}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -57,6 +60,9 @@
     </FxCompile>
     <FxCompile Include="..\Media\Shader\PixelShader.hlsl">
       <Filter>头文件\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Media\Effect\Shading.fx">
+      <Filter>头文件\Effects</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
