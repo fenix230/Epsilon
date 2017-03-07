@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="头文件\Shaders">
-      <UniqueIdentifier>{ae489c1e-869d-4a96-9c2d-6b0bfbe2ff61}</UniqueIdentifier>
-    </Filter>
     <Filter Include="源文件\DDSTextureLoader">
       <UniqueIdentifier>{8027f2b3-e227-4b3c-8c2d-6ac7686bd762}</UniqueIdentifier>
     </Filter>
@@ -55,14 +52,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Media\Shader\VertexShader.hlsl">
-      <Filter>头文件\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Media\Shader\PixelShader.hlsl">
-      <Filter>头文件\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Media\Effect\Shading.fx">
+    <None Include="..\Media\Effect\Shading.fx">
       <Filter>头文件\Effects</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>
