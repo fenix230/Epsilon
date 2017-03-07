@@ -322,9 +322,13 @@ namespace epsilon
 
 		void Perspective(float ang, float aspect, float near_plane, float far_plane);
 
-		Matrix world;
-		Matrix view;
-		Matrix proj;
+		Matrix world_;
+		Matrix view_;
+		Matrix proj_;
+
+		Vector3f eye_pos_;
+		Vector3f look_at_;
+		Vector3f up_;
 	};
 
 
@@ -353,7 +357,7 @@ namespace epsilon
 	class Renderable : public REObject
 	{
 	public:
-		virtual void Bind(Camera* cam) = 0;
+		virtual void Bind(Camera* cam, const Vector3f& light_dir) = 0;
 		virtual void Render(ShaderObject* so) = 0;
 	};
 
@@ -364,7 +368,7 @@ namespace epsilon
 		StaticMesh();
 		virtual ~StaticMesh();
 
-		virtual void Bind(Camera* cam) override;
+		virtual void Bind(Camera* cam, const Vector3f& light_dir) override;
 		virtual void Render(ShaderObject* so) override;
 
 		void CreateVertexBuffer(size_t num_vert, 
@@ -372,7 +376,7 @@ namespace epsilon
 			const Vector3f* norm_data, 
 			const Vector2f* tc_data);
 		void CreateIndexBuffer(size_t num_indice, const uint16_t* data);
-		void CreateTexture(const std::string& file_path);
+		void CreateMaterial(std::string file_path, Vector3f ka, Vector3f kd, Vector3f ks);
 		void CreateCBuffer();
 
 		void Destory();
@@ -393,10 +397,16 @@ namespace epsilon
 			Matrix world;
 			Matrix view;
 			Matrix proj;
+			Vector4f light_dir;
+			Vector4f eye_pos;
 		};
 
 		struct PS_CONSTANT
 		{
+			Vector4f light_dir;
+			Vector4f ka;
+			Vector4f kd;
+			Vector4f ks;
 			int tex_enabled;
 		};
 
@@ -412,6 +422,8 @@ namespace epsilon
 
 		ID3D11BufferPtr d3d_cbuffer_vs_;
 		ID3D11BufferPtr d3d_cbuffer_ps_;
+
+		Vector3f ka_, kd_, ks_;
 	};
 
 

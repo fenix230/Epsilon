@@ -104,6 +104,9 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		aiMesh const * mesh = scene->mMeshes[mi];
 
 		std::string tex_path;
+		Vector3f ka;
+		Vector3f kd;
+		Vector3f ks;
 		std::vector<Vector3f> pos_data;
 		std::vector<Vector3f> norm_data;
 		std::vector<Vector2f> tc_data;
@@ -111,6 +114,7 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		size_t num_vert = mesh->mNumVertices;
 
 		auto mtl = scene->mMaterials[mesh->mMaterialIndex];
+
 		unsigned int count = aiGetMaterialTextureCount(mtl, aiTextureType_DIFFUSE);
 		if (count > 0)
 		{
@@ -118,6 +122,19 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 			aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &str, 0, 0, 0, 0, 0, 0);
 			pp.append("/").append(str.C_Str());
 			tex_path = pp.string();
+		}
+
+		if (AI_SUCCESS != aiGetMaterialColor(mtl, "Ka", 0, 0, (aiColor4D*)&ka))
+		{
+			ka = Vector3f(0.2f, 0.2f, 0.2f);
+		}
+		if (AI_SUCCESS != aiGetMaterialColor(mtl, "Kd", 0, 0, (aiColor4D*)&kd))
+		{
+			kd = Vector3f(0.5f, 0.5f, 0.5f);
+		}
+		if (AI_SUCCESS != aiGetMaterialColor(mtl, "Ks", 0, 0, (aiColor4D*)&ks))
+		{
+			ks = Vector3f(0.7f, 0.7f, 0.7f);
 		}
 
 		for (unsigned int fi = 0; fi < mesh->mNumFaces; ++fi)
@@ -152,10 +169,7 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		r->CreateCBuffer();
 		r->CreateVertexBuffer(num_vert, pos_data.data(), norm_data.data(), tc_data.data());
 		r->CreateIndexBuffer(indice_data.size(), indice_data.data());
-		if (!tex_path.empty())
-		{
-			r->CreateTexture(tex_path);
-		}
+		r->CreateMaterial(tex_path, ka, kd, ks);
 		re.AddRenderable(r);
 	}
 

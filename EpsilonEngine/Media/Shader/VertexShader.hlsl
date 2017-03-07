@@ -1,8 +1,10 @@
-cbuffer VS_CBUFFER
+cbuffer VS_CBUFFER : register(b0)
 {
 	matrix world_mat;
 	matrix view_mat;
 	matrix proj_mat;
+	float4 light_dir;
+	float4 eye_pos;
 };
 
 struct VS_INPUT
@@ -17,6 +19,7 @@ struct VS_OUTPUT
 	float4 pos : SV_POSITION;
 	float3 norm : NORMAL;
 	float2 tc : TEXCOORD0;
+	float3 eye_dir : EYEDIRECTION;
 };
 
 VS_OUTPUT main(
@@ -37,6 +40,8 @@ VS_OUTPUT main(
 	output.norm = norm4.xyz;
 
 	output.tc = input.tc;
+
+	output.eye_dir = eye_pos.xyz - input.pos.xyz;
 
 	return output;
 }

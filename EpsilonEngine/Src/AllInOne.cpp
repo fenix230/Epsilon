@@ -405,15 +405,22 @@ namespace epsilon
 		num_indice_ = (UINT)num_indice;
 	}
 
-	void StaticMesh::CreateTexture(const std::string& file_path)
+	void StaticMesh::CreateMaterial(std::string file_path, Vector3f ka, Vector3f kd, Vector3f ks)
 	{
-		std::wstring wfile_path = ToWstring(file_path);
+		if (!file_path.empty())
+		{
+			std::wstring wfile_path = ToWstring(file_path);
 
-		ID3D11Resource* d3d_tex_res = nullptr;
-		ID3D11ShaderResourceView* d3d_tex_sr_view = nullptr;
-		THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_sr_view));
-		d3d_tex_res_ = MakeCOMPtr(d3d_tex_res);
-		d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
+			ID3D11Resource* d3d_tex_res = nullptr;
+			ID3D11ShaderResourceView* d3d_tex_sr_view = nullptr;
+			THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_sr_view));
+			d3d_tex_res_ = MakeCOMPtr(d3d_tex_res);
+			d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
+		}
+
+		ka_ = ka;
+		kd_ = kd;
+		ks_ = ks;
 	}
 
 	template<class T>
@@ -438,7 +445,7 @@ namespace epsilon
 
 		D3D11_BUFFER_DESC cbuffer_ps_desc;
 		cbuffer_ps_desc.Usage = D3D11_USAGE_DYNAMIC;
-		cbuffer_ps_desc.ByteWidth = CBufferByteWidth<VS_CONSTANT>::value;
+		cbuffer_ps_desc.ByteWidth = CBufferByteWidth<PS_CONSTANT>::value;
 		cbuffer_ps_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		cbuffer_ps_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		cbuffer_ps_desc.MiscFlags = 0;
@@ -517,16 +524,18 @@ namespace epsilon
 		d3d_cbuffer_ps_.reset();
 	}
 
-	void StaticMesh::Bind(Camera* cam)
+	void StaticMesh::Bind(Camera* cam, const Vector3f& light_dir)
 	{
 		//VS constant buffer
 		D3D11_MAPPED_SUBRESOURCE mapped_res_vs;
 		THROW_FAILED(re_->D3DContext()->Map(d3d_cbuffer_vs_.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_res_vs));
 
 		VS_CONSTANT* cbuffer_vs_ptr = (VS_CONSTANT*)mapped_res_vs.pData;
-		cbuffer_vs_ptr->world = XMMatrixTranspose(cam->world);
-		cbuffer_vs_ptr->view = XMMatrixTranspose(cam->view);
-		cbuffer_vs_ptr->proj = XMMatrixTranspose(cam->proj);
+		cbuffer_vs_ptr->world = XMMatrixTranspose(cam->world_);
+		cbuffer_vs_ptr->view = XMMatrixTranspose(cam->view_);
+		cbuffer_vs_ptr->proj = XMMatrixTranspose(cam->proj_);
+		cbuffer_vs_ptr->light_dir = Vector4f(light_dir.x, light_dir.y, light_dir.z, 0);
+		cbuffer_vs_ptr->eye_pos = Vector4f(cam->eye_pos_.x, cam->eye_pos_.y, cam->eye_pos_.z, 0);
 		re_->D3DContext()->Unmap(d3d_cbuffer_vs_.get(), 0);
 
 		ID3D11Buffer* d3d_cbuffer_vs = d3d_cbuffer_vs_.get();
@@ -538,6 +547,10 @@ namespace epsilon
 
 		PS_CONSTANT* cbuffer_ps_ptr = (PS_CONSTANT*)mapped_res_ps.pData;
 		cbuffer_ps_ptr->tex_enabled = (!d3d_tex_sr_view_ ? 0 : 1);
+		cbuffer_ps_ptr->light_dir = Vector4f(light_dir.x, light_dir.y, light_dir.z, 0);
+		cbuffer_ps_ptr->ka = Vector4f(ka_.x, ka_.y, ka_.z, 0);
+		cbuffer_ps_ptr->kd = Vector4f(kd_.x, kd_.y, kd_.z, 0);
+		cbuffer_ps_ptr->ks = Vector4f(ks_.x, ks_.y, ks_.z, 0);
 		re_->D3DContext()->Unmap(d3d_cbuffer_ps_.get(), 0);
 
 		ID3D11Buffer* d3d_cbuffer_ps = d3d_cbuffer_ps_.get();
@@ -580,12 +593,15 @@ namespace epsilon
 
 	void Camera::LookAt(Vector3f pos, Vector3f target, Vector3f up)
 	{
-		view = XMMatrixLookAtLH(pos.XMV(), target.XMV(), up.XMV());
+		view_ = XMMatrixLookAtLH(pos.XMV(), target.XMV(), up.XMV());
+		eye_pos_ = pos;
+		look_at_ = target;
+		up_ = up;
 	}
 
 	void Camera::Perspective(float ang, float aspect, float near_plane, float far_plane)
 	{
-		proj = XMMatrixPerspectiveFovLH(ang, aspect, near_plane, far_plane);
+		proj_ = XMMatrixPerspectiveFovLH(ang, aspect, near_plane, far_plane);
 	}
 
 
@@ -949,10 +965,12 @@ namespace epsilon
 		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
 		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+		Vector3f light_dir(-1.0f, -1.0f, 1.0f);
+
 		for (auto i = rs_.begin(); i != rs_.end(); i++)
 		{
 			RenderablePtr r = *i;
-			r->Bind(cam_.get());
+			r->Bind(cam_.get(), light_dir);
 			r->Render(so_.get());
 		}
 
