@@ -66,7 +66,7 @@ VS_OUTPUT ShadingVS(
 float4 ShadingPS(VS_OUTPUT input) : SV_TARGET
 {
 	float3 norm2 = normalize(input.norm);
-	float3 light_dir2 = float3(-1.0, -1.0, 1.0);
+	float3 light_dir2 = float3(-1.0, -1.0, -1.0);
 	light_dir2 = normalize(light_dir2);
 	float3 eye_dir2 = normalize(input.eye_dir);
 

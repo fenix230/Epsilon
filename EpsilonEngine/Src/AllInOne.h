@@ -298,11 +298,8 @@ namespace epsilon
 	RenderEngine* re_;
 
 	class RenderEngine;
-	DEFINE_SMART_POINTER(CBufferPerFrame);
-	//DEFINE_SMART_POINTER(ShaderObject);
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
-	DEFINE_SMART_POINTER(EffectObject);
 	DEFINE_SMART_POINTER(Camera);
 
 

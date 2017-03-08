@@ -190,7 +190,7 @@ int main()
 		re.LoadEffect("../../../Media/Effect/Shading.fx");
 
 		CameraPtr cam = std::make_shared<Camera>();
-		Vector3f eye(0, 2, -3), at(0, 0, 0), up(0, 1, 0);
+		Vector3f eye(0, 2, -2), at(0, 0, 0), up(0, 1, 0);
 		cam->LookAt(eye, at, up);
 		cam->Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
 		re.SetCamera(cam);
