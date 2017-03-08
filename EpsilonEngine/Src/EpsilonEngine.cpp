@@ -120,8 +120,9 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		{
 			aiString str;
 			aiGetMaterialTexture(mtl, aiTextureType_DIFFUSE, 0, &str, 0, 0, 0, 0, 0, 0);
-			pp.append("/").append(str.C_Str());
-			tex_path = pp.string();
+			auto pp2 = pp;
+			pp2.append("/").append(str.C_Str());
+			tex_path = pp2.string();
 		}
 
 		if (AI_SUCCESS != aiGetMaterialColor(mtl, "Ka", 0, 0, (aiColor4D*)&ka))
@@ -190,12 +191,12 @@ int main()
 		re.LoadEffect("../../../Media/Effect/Shading.fx");
 
 		CameraPtr cam = std::make_shared<Camera>();
-		Vector3f eye(0, 2, -2), at(0, 0, 0), up(0, 1, 0);
+		Vector3f eye(-30, 12, 0), at(40, 15, 0), up(0, 1, 0);
 		cam->LookAt(eye, at, up);
 		cam->Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
 		re.SetCamera(cam);
 
-		LoadAssimpStaticMesh(re, "../../../Media/Model/Cup/cup.obj");
+		LoadAssimpStaticMesh(re, "../../../Media/Model/Sponza/sponza.obj");
 
 		app.Run();
 	}
