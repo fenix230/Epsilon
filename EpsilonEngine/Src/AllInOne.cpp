@@ -54,6 +54,8 @@ namespace epsilon
 	Window::Window(const std::string& name, int width, int height)
 		: active_(false), ready_(false), closed_(false), dpi_scale_(1), win_rotation_(WR_Identity), hide_(false)
 	{
+		re_ = nullptr;
+
 		this->DetectsDPI();
 
 		HINSTANCE hInst = ::GetModuleHandle(nullptr);
@@ -189,6 +191,11 @@ namespace epsilon
 		return win_rotation_;
 	}
 
+	void Window::SetRE(RenderEngine& re)
+	{
+		re_ = &re;
+	}
+
 	LRESULT Window::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 #pragma warning(push)
@@ -280,6 +287,10 @@ namespace epsilon
 			{
 				active_ = true;
 				//this->OnSize()(*this, true);
+				if (re_)
+				{
+					re_->Resize(width_, height_);
+				}
 			}
 		}
 		break;
@@ -598,9 +609,7 @@ namespace epsilon
 	void RenderEngine::Create(HWND wnd, int width, int height)
 	{
 		wnd_ = wnd;
-		width_ = width;
-		height_ = height;
-
+		
 		IDXGIFactory1* gi_factory;
 		THROW_FAILED(DynamicCreateDXGIFactory1_(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&gi_factory)));
 		gi_factory_1_ = MakeCOMPtr(gi_factory);
@@ -644,39 +653,83 @@ namespace epsilon
 		d3d_device_ = MakeCOMPtr(d3d_device);
 		d3d_imm_ctx_ = MakeCOMPtr(d3d_imm_ctx);
 
+		//Rasterizer
+		D3D11_RASTERIZER_DESC raster_desc;
+		raster_desc.AntialiasedLineEnable = false;
+		raster_desc.CullMode = D3D11_CULL_BACK;
+		raster_desc.DepthBias = 0;
+		raster_desc.DepthBiasClamp = 0.0f;
+		raster_desc.DepthClipEnable = true;
+		raster_desc.FillMode = D3D11_FILL_SOLID;
+		raster_desc.FrontCounterClockwise = false;
+		raster_desc.MultisampleEnable = false;
+		raster_desc.ScissorEnable = false;
+		raster_desc.SlopeScaledDepthBias = 0.0f;
+
+		ID3D11RasterizerState* raster_state = nullptr;
+		THROW_FAILED(d3d_device_->CreateRasterizerState(&raster_desc, &raster_state));
+		d3d_raster_state_ = MakeCOMPtr(raster_state);
+
+		d3d_imm_ctx_->RSSetState(raster_state);
+
+		this->Resize(width, height);
+	}
+
+	void RenderEngine::Resize(int width, int height)
+	{
+		width_ = width;
+		height_ = height;
+
+		d3d_imm_ctx_->OMSetRenderTargets(0, 0, 0);
+		d3d_imm_ctx_->OMSetDepthStencilState(0, 0);
+
+		d3d_depth_stencil_view_.reset();
+		d3d_depth_stencil_state_.reset();
+		d3d_depth_stencil_buffer_.reset();
+		d3d_render_target_view_.reset();
+
 		//SwapChain
-		DXGI_SWAP_CHAIN_DESC1 sc_desc1;
-		ZeroMemory(&sc_desc1, sizeof(sc_desc1));
-		sc_desc1.Width = width_;
-		sc_desc1.Height = height_;
-		sc_desc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		sc_desc1.Stereo = false;
-		sc_desc1.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		sc_desc1.BufferCount = 2;
-		sc_desc1.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-		sc_desc1.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-		sc_desc1.SampleDesc.Count = 1;
-		sc_desc1.SampleDesc.Quality = 0;
-		sc_desc1.Scaling = DXGI_SCALING_STRETCH;
-		sc_desc1.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-		DXGI_SWAP_CHAIN_FULLSCREEN_DESC sc_fs_desc;
-		sc_fs_desc.RefreshRate.Numerator = 60;
-		sc_fs_desc.RefreshRate.Denominator = 1;
-		sc_fs_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-		sc_fs_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-		sc_fs_desc.Windowed = true;
-
 		IDXGISwapChain1* dxgi_sc = nullptr;
-		THROW_FAILED(gi_factory_2_->CreateSwapChainForHwnd(d3d_device, wnd_, &sc_desc1, &sc_fs_desc, nullptr, &dxgi_sc));
-		gi_swap_chain_1_ = MakeCOMPtr(dxgi_sc);
+		if (gi_swap_chain_1_)
+		{
+			dxgi_sc = gi_swap_chain_1_.get();
+			THROW_FAILED(dxgi_sc->ResizeBuffers(2, width_, height_, DXGI_FORMAT_R8G8B8A8_UNORM, 
+				DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
+		}
+		else
+		{
+			DXGI_SWAP_CHAIN_DESC1 sc_desc1;
+			ZeroMemory(&sc_desc1, sizeof(sc_desc1));
+			sc_desc1.Width = width_;
+			sc_desc1.Height = height_;
+			sc_desc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			sc_desc1.Stereo = false;
+			sc_desc1.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+			sc_desc1.BufferCount = 2;
+			sc_desc1.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+			sc_desc1.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+			sc_desc1.SampleDesc.Count = 1;
+			sc_desc1.SampleDesc.Quality = 0;
+			sc_desc1.Scaling = DXGI_SCALING_STRETCH;
+			sc_desc1.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+			DXGI_SWAP_CHAIN_FULLSCREEN_DESC sc_fs_desc;
+			sc_fs_desc.RefreshRate.Numerator = 60;
+			sc_fs_desc.RefreshRate.Denominator = 1;
+			sc_fs_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+			sc_fs_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+			sc_fs_desc.Windowed = true;
+
+			THROW_FAILED(gi_factory_2_->CreateSwapChainForHwnd(d3d_device_.get(), wnd_, &sc_desc1, &sc_fs_desc, nullptr, &dxgi_sc));
+			gi_swap_chain_1_ = MakeCOMPtr(dxgi_sc);
+		}
 
 		//Render target view
 		ID3D11Texture2D* back_buffer = nullptr;
 		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&back_buffer));
 
 		ID3D11RenderTargetView* d3d_render_target_view = nullptr;
-		THROW_FAILED(d3d_device->CreateRenderTargetView(back_buffer, NULL, &d3d_render_target_view));
+		THROW_FAILED(d3d_device_->CreateRenderTargetView(back_buffer, NULL, &d3d_render_target_view));
 		d3d_render_target_view_ = MakeCOMPtr(d3d_render_target_view);
 
 		back_buffer->Release();
@@ -698,7 +751,7 @@ namespace epsilon
 		depth_buffer_desc.MiscFlags = 0;
 
 		ID3D11Texture2D* depth_stencil_buffer;
-		THROW_FAILED(d3d_device->CreateTexture2D(&depth_buffer_desc, NULL, &depth_stencil_buffer));
+		THROW_FAILED(d3d_device_->CreateTexture2D(&depth_buffer_desc, NULL, &depth_stencil_buffer));
 		d3d_depth_stencil_buffer_ = MakeCOMPtr(depth_stencil_buffer);
 
 		D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
@@ -719,10 +772,10 @@ namespace epsilon
 		depth_stencil_desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
 		ID3D11DepthStencilState* depth_stencil_state = nullptr;
-		THROW_FAILED(d3d_device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state));
+		THROW_FAILED(d3d_device_->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state));
 		d3d_depth_stencil_state_ = MakeCOMPtr(depth_stencil_state);
 
-		d3d_imm_ctx->OMSetDepthStencilState(depth_stencil_state, 1);
+		d3d_imm_ctx_->OMSetDepthStencilState(depth_stencil_state, 1);
 
 		D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc;
 		ZeroMemory(&depth_stencil_view_desc, sizeof(depth_stencil_view_desc));
@@ -731,30 +784,11 @@ namespace epsilon
 		depth_stencil_view_desc.Texture2D.MipSlice = 0;
 
 		ID3D11DepthStencilView* depth_stencil_view = nullptr;
-		THROW_FAILED(d3d_device->CreateDepthStencilView(depth_stencil_buffer, &depth_stencil_view_desc, &depth_stencil_view));
+		THROW_FAILED(d3d_device_->CreateDepthStencilView(depth_stencil_buffer, &depth_stencil_view_desc, &depth_stencil_view));
 		d3d_depth_stencil_view_ = MakeCOMPtr(depth_stencil_view);
 
 		//Bind render target
-		d3d_imm_ctx->OMSetRenderTargets(1, &d3d_render_target_view, depth_stencil_view);
-
-		//Rasterizer
-		D3D11_RASTERIZER_DESC raster_desc;
-		raster_desc.AntialiasedLineEnable = false;
-		raster_desc.CullMode = D3D11_CULL_BACK;
-		raster_desc.DepthBias = 0;
-		raster_desc.DepthBiasClamp = 0.0f;
-		raster_desc.DepthClipEnable = true;
-		raster_desc.FillMode = D3D11_FILL_SOLID;
-		raster_desc.FrontCounterClockwise = false;
-		raster_desc.MultisampleEnable = false;
-		raster_desc.ScissorEnable = false;
-		raster_desc.SlopeScaledDepthBias = 0.0f;
-
-		ID3D11RasterizerState* raster_state = nullptr;
-		THROW_FAILED(d3d_device->CreateRasterizerState(&raster_desc, &raster_state));
-		d3d_raster_state_ = MakeCOMPtr(raster_state);
-
-		d3d_imm_ctx->RSSetState(raster_state);
+		d3d_imm_ctx_->OMSetRenderTargets(1, &d3d_render_target_view, depth_stencil_view);
 
 		//Viewport
 		D3D11_VIEWPORT viewport;
@@ -765,7 +799,7 @@ namespace epsilon
 		viewport.TopLeftX = 0.0f;
 		viewport.TopLeftY = 0.0f;
 
-		d3d_imm_ctx->RSSetViewports(1, &viewport);
+		d3d_imm_ctx_->RSSetViewports(1, &viewport);
 	}
 
 	void RenderEngine::Destory()
@@ -902,6 +936,8 @@ namespace epsilon
 
 		re_ = std::make_unique<RenderEngine>();
 		re_->Create(main_wnd_->HWnd(), width, height);
+
+		main_wnd_->SetRE(*re_);
 	}
 
 	void Application::Destory()

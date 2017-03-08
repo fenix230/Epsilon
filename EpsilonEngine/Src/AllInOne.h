@@ -224,6 +224,8 @@ namespace epsilon
 	typedef std::shared_ptr<ID3D11ShaderResourceView>	ID3D11ShaderResourceViewPtr;
 	typedef std::shared_ptr<ID3DX11Effect>				ID3DX11EffectPtr;
 
+	class RenderEngine;
+
 	class Window
 	{
 	public:
@@ -259,6 +261,8 @@ namespace epsilon
 
 		WindowRotation Rotation() const;
 
+		void SetRE(RenderEngine& re);
+
 	private:
 		static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		static BOOL CALLBACK EnumMonProc(HMONITOR mon, HDC dc_mon, RECT* rc_mon, LPARAM lparam);
@@ -286,6 +290,8 @@ namespace epsilon
 
 		HWND wnd_;
 		WNDPROC default_wnd_proc_;
+
+		RenderEngine* re_;
 	};
 
 
@@ -297,7 +303,6 @@ namespace epsilon
 	inline void SetRE(RenderEngine& re) { re_ = &re; }\
 	RenderEngine* re_;
 
-	class RenderEngine;
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
 	DEFINE_SMART_POINTER(Camera);
@@ -390,6 +395,8 @@ namespace epsilon
 
 		void Create(HWND wnd, int width, int height);
 		void Destory();
+
+		void Resize(int width, int height);
 
 		void LoadEffect(std::string file_path);
 

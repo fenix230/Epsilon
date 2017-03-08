@@ -180,8 +180,8 @@ int main()
 {
 	try
 	{
-		int width = 1024;
-		int height = 768;
+		int width = 1600;
+		int height = 900;
 
 		Application app;
 		app.Create("Test", width, height);
