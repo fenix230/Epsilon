@@ -15,7 +15,7 @@ float4x4	g_proj_mat;
 
 SamplerState aniso_sampler
 {
-	Filter = MIN_MAG_MIP_LINEAR;
+	Filter = ANISOTROPIC;
 	AddressU = Wrap;
 	AddressV = Wrap;
 };
