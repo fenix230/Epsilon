@@ -188,8 +188,6 @@ int main()
 
 		RenderEngine& re = app.RE();
 
-		re.LoadEffect("../../../Media/Effect/Shading.fx");
-
 		CameraPtr cam = std::make_shared<Camera>();
 		Vector3f eye(-30, 12, 0), at(40, 15, 0), up(0, 1, 0);
 		cam->LookAt(eye, at, up);

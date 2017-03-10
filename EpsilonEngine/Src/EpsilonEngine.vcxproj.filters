@@ -56,4 +56,9 @@
       <Filter>头文件\Effects</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\Media\Effect\DeferredRendering.fx">
+      <Filter>头文件\Effects</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>

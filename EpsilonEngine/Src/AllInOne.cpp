@@ -47,6 +47,7 @@ namespace epsilon
 	}
 
 
+#define DO_THROW_MSG(x)	{ throw std::exception(x); }
 #define DO_THROW(x)	{ throw std::system_error(std::make_error_code(x), CombineFileLine(__FILE__, __LINE__)); }
 #define THROW_FAILED(x)	{ HRESULT _hr = x; if (static_cast<HRESULT>(_hr) < 0) { throw std::runtime_error(CombineFileLine(__FILE__, __LINE__)); } }
 
@@ -486,31 +487,31 @@ namespace epsilon
 
 	void StaticMesh::Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass)
 	{
-		//Shader resource view
+		//Material
 		if (d3d_tex_sr_view_)
 		{
-			auto var_g_tex = effect->GetVariableByName("g_tex")->AsShaderResource();
-			var_g_tex->SetResource(d3d_tex_sr_view_.get());
+			auto var_g_albedo_tex = effect->GetVariableByName("g_albedo_tex")->AsShaderResource();
+			var_g_albedo_tex->SetResource(d3d_tex_sr_view_.get());
 
-			auto var_g_tex_enabled = effect->GetVariableByName("g_tex_enabled")->AsScalar();
-			var_g_tex_enabled->SetBool(true);
+			auto var_g_albedo_map_enabled = effect->GetVariableByName("g_albedo_map_enabled")->AsScalar();
+			var_g_albedo_map_enabled->SetBool(true);
 		}
 		else
 		{
-			auto var_g_tex_enabled = effect->GetVariableByName("g_tex_enabled")->AsScalar();
-			var_g_tex_enabled->SetBool(false);
+			auto var_g_albedo_map_enabled = effect->GetVariableByName("g_albedo_map_enabled")->AsScalar();
+			var_g_albedo_map_enabled->SetBool(false);
 		}
 
-		//ka¡¢kd¡¢ks
-		auto var_g_ka = effect->GetVariableByName("g_ka")->AsVector();
-		auto var_g_kd = effect->GetVariableByName("g_kd")->AsVector();
-		auto var_g_ks = effect->GetVariableByName("g_ks")->AsVector();
-		Vector4f v4 = Vector4f(ka_.x, ka_.y, ka_.z, 0);
-		var_g_ka->SetFloatVector((float*)&v4);
-		v4 = Vector4f(kd_.x, kd_.y, kd_.z, 0);
-		var_g_kd->SetFloatVector((float*)&v4);
-		v4 = Vector4f(ks_.x, ks_.y, ks_.z, 0);
-		var_g_ks->SetFloatVector((float*)&v4);
+		auto var_g_albedo_clr = effect->GetVariableByName("g_albedo_clr")->AsVector();
+		var_g_albedo_clr->SetFloatVector((float*)&ka_);
+
+		auto var_g_metalness_clr = effect->GetVariableByName("g_metalness_clr")->AsVector();
+		Vector2f metalness_clr(0.02f, 0);
+		var_g_metalness_clr->SetFloatVector((float*)&metalness_clr);
+
+		auto var_g_glossiness_clr = effect->GetVariableByName("g_glossiness_clr")->AsVector();
+		Vector2f glossiness_clr(0.04f, 0);
+		var_g_glossiness_clr->SetFloatVector((float*)&glossiness_clr);
 
 		//Vertex buffer and index buffer
 		std::array<ID3D11Buffer*, 1> buffers = {
@@ -539,12 +540,12 @@ namespace epsilon
 
 	void Camera::Bind(ID3DX11Effect* effect)
 	{
-		auto var_g_world_mat = effect->GetVariableByName("g_world_mat")->AsMatrix();
+		auto var_g_model_mat = effect->GetVariableByName("g_model_mat")->AsMatrix();
 		auto var_g_view_mat = effect->GetVariableByName("g_view_mat")->AsMatrix();
 		auto var_g_proj_mat = effect->GetVariableByName("g_proj_mat")->AsMatrix();
 		auto var_g_eye_pos = effect->GetVariableByName("g_eye_pos")->AsVector();
 
-		var_g_world_mat->SetMatrix((float*)&world_);
+		var_g_model_mat->SetMatrix((float*)&world_);
 		var_g_view_mat->SetMatrix((float*)&view_);
 		var_g_proj_mat->SetMatrix((float*)&proj_);
 		Vector4f v4(eye_pos_.x, eye_pos_.y, eye_pos_.z, 0);
@@ -673,6 +674,8 @@ namespace epsilon
 		d3d_imm_ctx_->RSSetState(raster_state);
 
 		this->Resize(width, height);
+
+		this->LoadEffect("../../../Media/Effect/DeferredRendering.fx");
 	}
 
 	void RenderEngine::Resize(int width, int height)
@@ -837,8 +840,22 @@ namespace epsilon
 
 		ID3DX11Effect* d3d_effect = nullptr;
 		ID3DBlob* d3d_error_blob = nullptr;
-		THROW_FAILED(D3DX11CompileEffectFromFile(wfile_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-			D3DCOMPILE_ENABLE_STRICTNESS, 0, this->D3DDevice(), &d3d_effect, &d3d_error_blob));
+
+		HRESULT hr = D3DX11CompileEffectFromFile(wfile_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			D3DCOMPILE_ENABLE_STRICTNESS, 0, this->D3DDevice(), &d3d_effect, &d3d_error_blob);
+
+		if (FAILED(hr) && d3d_error_blob)
+		{
+			const char* err = reinterpret_cast<const char*>(d3d_error_blob->GetBufferPointer());
+			std::string serr = err;
+
+			d3d_error_blob->Release();
+			d3d_error_blob = nullptr;
+
+			DO_THROW_MSG(serr.c_str());
+		}
+		THROW_FAILED(hr);
+
 		d3d_effect_ = MakeCOMPtr(d3d_effect);
 	}
 

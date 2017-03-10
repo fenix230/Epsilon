@@ -63,7 +63,14 @@ VS_OUTPUT ShadingVS(
 }
 
 
-float4 ShadingPS(VS_OUTPUT input) : SV_TARGET
+struct PS_OUTPUT
+{
+	float4 clr : SV_Target0;
+	float4 clr1 : SV_Target1;
+};
+
+
+PS_OUTPUT ShadingPS(VS_OUTPUT input)
 {
 	float3 norm2 = normalize(input.norm);
 	float3 light_dir2 = normalize(input.light_dir);
@@ -82,17 +89,19 @@ float4 ShadingPS(VS_OUTPUT input) : SV_TARGET
 	out_color.y = clamp(out_color.y, 0.0, 1.0);
 	out_color.z = clamp(out_color.z, 0.0, 1.0);
 
-	return out_color;
+	PS_OUTPUT output;
+	output.clr = out_color;
+	output.clr1 = float4(0, 0, 0, 0);
+
+	return output;
 }
 
 technique11 RenderSceneWithTexture1Light
 {
 	pass P0
 	{
-		SetVertexShader(CompileShader(vs_4_0_level_9_1, ShadingVS()));
-		SetGeometryShader(NULL);
-		SetPixelShader(CompileShader(ps_4_0_level_9_1, ShadingPS()));
-
+		SetVertexShader(CompileShader(vs_5_0, ShadingVS()));
+		SetPixelShader(CompileShader(ps_5_0, ShadingPS()));
 		SetDepthStencilState(EnableDepth, 0);
 	}
 }
