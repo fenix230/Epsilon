@@ -872,7 +872,7 @@ namespace epsilon
 		d3d_imm_ctx_->OMSetDepthStencilState(0, 0);
 
 		gbuffer_pass_fb_.reset();
-		shading_pass_fb_.reset();
+		ambient_pass_fb_.reset();
 
 		//SwapChain
 		IDXGISwapChain1* dxgi_sc = nullptr;
@@ -916,8 +916,13 @@ namespace epsilon
 
 		ID3D11Texture2D* frame_buffer = nullptr;
 		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&frame_buffer));
-		shading_pass_fb_ = this->MakeObject<FrameBuffer>();
-		shading_pass_fb_->Create(width_, height_, frame_buffer);
+
+		ambient_pass_fb_ = this->MakeObject<FrameBuffer>();
+		ambient_pass_fb_->Create(width_, height_, frame_buffer);
+
+		sun_pass_fb_ = this->MakeObject<FrameBuffer>();
+		sun_pass_fb_->Create(width_, height_, frame_buffer);
+
 		frame_buffer->Release();
 		frame_buffer = nullptr;
 
@@ -944,7 +949,8 @@ namespace epsilon
 		}
 
 		gbuffer_pass_fb_.reset();
-		shading_pass_fb_.reset();
+		ambient_pass_fb_.reset();
+		sun_pass_fb_.reset();
 
 		quad_.reset();
 
@@ -1017,8 +1023,8 @@ namespace epsilon
 		//LightingAmbient pass
 		pass = tech->GetPassByName("LightingAmbient");
 
-		shading_pass_fb_->Clear();
-		shading_pass_fb_->Bind();
+		ambient_pass_fb_->Clear();
+		ambient_pass_fb_->Bind();
 
 		auto var_g_buffer_tex = d3d_effect_->GetVariableByName("g_buffer_tex")->AsShaderResource();
 		auto var_g_buffer_1_tex = d3d_effect_->GetVariableByName("g_buffer_1_tex")->AsShaderResource();
@@ -1031,14 +1037,22 @@ namespace epsilon
 
 		Vector3f light_dir(1, 1, 1);
 		Vector4f light_attrib(1, 1, 0, 0);
-		Vector3f light_color(1.2f, 1.2f, 1.2f);
+		Vector3f light_color(0.2f, 0.2f, 0.2f);
 
 		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
 		var_g_light_attrib->SetFloatVector((float*)&light_attrib);
 		var_g_light_color->SetFloatVector((float*)&light_color);
 
 		quad_->Render(d3d_effect_.get(), pass);
+
+		//LightingSun pass
+		pass = tech->GetPassByName("LightingSun");
+
+		light_color = Vector3f(1, 1, 1);
+		var_g_light_color->SetFloatVector((float*)&light_color);
 		
+		quad_->Render(d3d_effect_.get(), pass);
+
 		gi_swap_chain_1_->Present(0, 0);
 	}
 

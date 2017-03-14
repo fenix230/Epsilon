@@ -516,7 +516,8 @@ namespace epsilon
 		ID3D11DeviceContextPtr d3d_imm_ctx_;
 
 		FrameBufferPtr gbuffer_pass_fb_;
-		FrameBufferPtr shading_pass_fb_;
+		FrameBufferPtr ambient_pass_fb_;
+		FrameBufferPtr sun_pass_fb_;
 
 		ID3DX11EffectPtr d3d_effect_;
 
