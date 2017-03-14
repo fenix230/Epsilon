@@ -424,10 +424,10 @@ namespace epsilon
 			std::wstring wfile_path = ToWstring(file_path);
 
 			ID3D11Resource* d3d_tex_res = nullptr;
-			ID3D11ShaderResourceView* d3d_tex_sr_view = nullptr;
-			THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_sr_view));
-			d3d_tex_res_ = MakeCOMPtr(d3d_tex_res);
-			d3d_tex_sr_view_ = MakeCOMPtr(d3d_tex_sr_view);
+			ID3D11ShaderResourceView* d3d_tex_srv = nullptr;
+			THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_srv));
+			d3d_tex_ = MakeCOMPtr(d3d_tex_res);
+			d3d_srv_ = MakeCOMPtr(d3d_tex_srv);
 		}
 
 		ka_ = ka;
@@ -480,18 +480,17 @@ namespace epsilon
 		d3d_input_layouts_.clear();
 		d3d_vertex_buffer_.reset();
 		d3d_index_buffer_.reset();
-		d3d_tex_res_.reset();
-		d3d_tex_sr_view_.reset();
+		d3d_tex_.reset();
+		d3d_srv_.reset();
 	}
-
 
 	void StaticMesh::Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass)
 	{
 		//Material
-		if (d3d_tex_sr_view_)
+		if (d3d_srv_)
 		{
 			auto var_g_albedo_tex = effect->GetVariableByName("g_albedo_tex")->AsShaderResource();
-			var_g_albedo_tex->SetResource(d3d_tex_sr_view_.get());
+			var_g_albedo_tex->SetResource(d3d_srv_.get());
 
 			auto var_g_albedo_map_enabled = effect->GetVariableByName("g_albedo_map_enabled")->AsScalar();
 			var_g_albedo_map_enabled->SetBool(true);
@@ -538,18 +537,112 @@ namespace epsilon
 		re_->D3DContext()->DrawIndexed(num_indice_, 0, 0);
 	}
 
+	Quad::Quad()
+	{
+
+	}
+
+	Quad::~Quad()
+	{
+		this->Destory();
+	}
+
+	void Quad::Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass)
+	{
+		if (!d3d_vertex_buffer_)
+		{
+			Vector3f vs_inputs[] =
+			{
+				Vector3f(+1, +1, 1),
+				Vector3f(-1, +1, 1),
+				Vector3f(+1, -1, 1),
+				Vector3f(-1, -1, 1)
+			};
+
+			D3D11_BUFFER_DESC buffer_desc;
+			buffer_desc.Usage = D3D11_USAGE_DEFAULT;
+			buffer_desc.ByteWidth = sizeof(Vector3f) * (UINT)std::size(vs_inputs);
+			buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			buffer_desc.CPUAccessFlags = 0;
+			buffer_desc.MiscFlags = 0;
+			buffer_desc.StructureByteStride = 0;
+
+			D3D11_SUBRESOURCE_DATA buffer_data;
+			buffer_data.pSysMem = vs_inputs;
+			buffer_data.SysMemPitch = 0;
+			buffer_data.SysMemSlicePitch = 0;
+
+			ID3D11Buffer* d3d_buffer = nullptr;
+			THROW_FAILED(re_->D3DDevice()->CreateBuffer(&buffer_desc, &buffer_data, &d3d_buffer));
+			d3d_vertex_buffer_ = MakeCOMPtr(d3d_buffer);
+		}
+
+		//Vertex buffer and index buffer
+		std::array<ID3D11Buffer*, 1> buffers = {
+			d3d_vertex_buffer_.get()
+		};
+
+		std::array<UINT, 1> strides = {
+			sizeof(Vector3f)
+		};
+
+		std::array<UINT, 1> offsets = {
+			0
+		};
+
+		re_->D3DContext()->IASetVertexBuffers(0, 1, buffers.data(), strides.data(), offsets.data());
+
+		re_->D3DContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+		re_->D3DContext()->IASetInputLayout(this->D3DInputLayout(pass));
+
+		pass->Apply(0, re_->D3DContext());
+
+		re_->D3DContext()->Draw(4, 0);
+	}
+
+	void Quad::Destory()
+	{
+		d3d_input_layouts_.clear();
+	}
+
+	ID3D11InputLayout* Quad::D3DInputLayout(ID3DX11EffectPass* pass)
+	{
+		for (auto i = d3d_input_layouts_.begin(); i != d3d_input_layouts_.end(); i++)
+		{
+			if (i->first == pass)
+			{
+				return i->second.get();
+			}
+		}
+
+		const D3D11_INPUT_ELEMENT_DESC d3d_elems_descs[] =
+		{
+			{ "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		};
+
+		D3DX11_PASS_DESC pass_desc;
+		THROW_FAILED(pass->GetDesc(&pass_desc));
+
+		ID3D11InputLayout* d3d_input_layout = nullptr;
+		THROW_FAILED(re_->D3DDevice()->CreateInputLayout(d3d_elems_descs, (UINT)std::size(d3d_elems_descs),
+			pass_desc.pIAInputSignature, pass_desc.IAInputSignatureSize, &d3d_input_layout));
+
+		d3d_input_layouts_.emplace_back(pass, MakeCOMPtr(d3d_input_layout));
+
+		return d3d_input_layout;
+	}
+
+
 	void Camera::Bind(ID3DX11Effect* effect)
 	{
 		auto var_g_model_mat = effect->GetVariableByName("g_model_mat")->AsMatrix();
 		auto var_g_view_mat = effect->GetVariableByName("g_view_mat")->AsMatrix();
 		auto var_g_proj_mat = effect->GetVariableByName("g_proj_mat")->AsMatrix();
-		auto var_g_eye_pos = effect->GetVariableByName("g_eye_pos")->AsVector();
 
 		var_g_model_mat->SetMatrix((float*)&world_);
 		var_g_view_mat->SetMatrix((float*)&view_);
 		var_g_proj_mat->SetMatrix((float*)&proj_);
-		Vector4f v4(eye_pos_.x, eye_pos_.y, eye_pos_.z, 0);
-		var_g_eye_pos->SetFloatVector((float*)&v4);
 	}
 
 	void Camera::LookAt(Vector3f pos, Vector3f target, Vector3f up)
@@ -563,6 +656,115 @@ namespace epsilon
 	void Camera::Perspective(float ang, float aspect, float near_plane, float far_plane)
 	{
 		proj_ = XMMatrixPerspectiveFovLH(ang, aspect, near_plane, far_plane);
+	}
+
+
+	FrameBuffer::FrameBuffer()
+	{
+		rtv_fmt_ = DXGI_FORMAT_R8G8B8A8_UNORM;
+		dsv_fmt_ = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	}
+
+	FrameBuffer::~FrameBuffer()
+	{
+		this->Destory();
+	}
+
+	void FrameBuffer::Create(uint32_t width, uint32_t height, ID3D11Texture2D* sc_buffer)
+	{
+		this->Create(width, height, 1, sc_buffer, 0);
+	}
+
+	void FrameBuffer::Create(uint32_t width, uint32_t height, size_t rtv_count)
+	{
+		this->Create(width, height, rtv_count, nullptr, -1);
+	}
+
+	void FrameBuffer::Create(uint32_t width, uint32_t height, size_t rtv_count, ID3D11Texture2D* sc_buffer, size_t sc_index)
+	{
+		//Render target view
+		rtvs_.resize(rtv_count);
+
+		for (size_t i = 0; i != rtv_count; i++)
+		{
+			RTV& rtv = rtvs_[i];
+			if (i == sc_index)
+			{
+				rtv.d3d_rtv_ = MakeCOMPtr(re_->D3DCreateRenderTargetView(sc_buffer));
+			}
+			else
+			{
+				rtv.d3d_rtv_tex_ = MakeCOMPtr(re_->D3DCreateTexture2D(width, height, rtv_fmt_,
+					D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE));
+
+				D3D11_RENDER_TARGET_VIEW_DESC d3d_rtv_desc;
+				d3d_rtv_desc.Format = rtv_fmt_;
+				d3d_rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+				d3d_rtv_desc.Texture2D.MipSlice = 0;
+
+				ID3D11RenderTargetView* d3d_rtv = nullptr;
+				THROW_FAILED(re_->D3DDevice()->CreateRenderTargetView(rtv.d3d_rtv_tex_.get(), &d3d_rtv_desc, &d3d_rtv));
+				
+				rtv.d3d_rtv_ = MakeCOMPtr(d3d_rtv);
+			}
+		}
+
+		//Depth stencil view
+		d3d_dsv_tex_ = MakeCOMPtr(re_->D3DCreateTexture2D(width, height,
+			dsv_fmt_, D3D11_BIND_DEPTH_STENCIL));
+
+		d3d_dsv_ = MakeCOMPtr(re_->D3DCreateDepthStencilView(d3d_dsv_tex_.get(),
+			dsv_fmt_));
+	}
+
+	void FrameBuffer::Destory()
+	{
+		rtvs_.clear();
+		d3d_dsv_tex_.reset();
+		d3d_dsv_.reset();
+	}
+
+	void FrameBuffer::Clear(Vector4f* c)
+	{
+		float clean_color[4] = { 0, 0, 0, 1 };
+		float* pc = (c != nullptr ? (float*)c : clean_color);
+
+		for (size_t i = 0; i != rtvs_.size(); i++)
+		{
+			re_->D3DContext()->ClearRenderTargetView(rtvs_[i].d3d_rtv_.get(), pc);
+		}
+		
+		re_->D3DContext()->ClearDepthStencilView(d3d_dsv_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+	}
+
+	void FrameBuffer::Bind()
+	{
+		//Bind render target
+		std::vector<ID3D11RenderTargetView*> d3d_rtvs;
+		for (size_t i = 0; i != rtvs_.size(); i++)
+		{
+			d3d_rtvs.push_back(rtvs_[i].d3d_rtv_.get());
+		}
+
+		re_->D3DContext()->OMSetRenderTargets((UINT)d3d_rtvs.size(), d3d_rtvs.data(), d3d_dsv_.get());
+	}
+
+	ID3D11ShaderResourceView* FrameBuffer::RetriveShaderResourceView(size_t index)
+	{
+		if (!rtvs_[index].d3d_srv_)
+		{
+			D3D11_SHADER_RESOURCE_VIEW_DESC d3d_srv_desc;
+			d3d_srv_desc.Format = rtv_fmt_;
+			d3d_srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			d3d_srv_desc.Texture2D.MostDetailedMip = 0;
+			d3d_srv_desc.Texture2D.MipLevels = 1;
+
+			ID3D11ShaderResourceView* d3d_srv = nullptr;
+			THROW_FAILED(re_->D3DDevice()->CreateShaderResourceView(rtvs_[index].d3d_rtv_tex_.get(), &d3d_srv_desc, &d3d_srv));
+			rtvs_[index].d3d_srv_ = MakeCOMPtr(d3d_srv);
+		}
+		
+		return rtvs_[index].d3d_srv_.get();
 	}
 
 
@@ -654,24 +856,7 @@ namespace epsilon
 		d3d_device_ = MakeCOMPtr(d3d_device);
 		d3d_imm_ctx_ = MakeCOMPtr(d3d_imm_ctx);
 
-		//Rasterizer
-		D3D11_RASTERIZER_DESC raster_desc;
-		raster_desc.AntialiasedLineEnable = false;
-		raster_desc.CullMode = D3D11_CULL_BACK;
-		raster_desc.DepthBias = 0;
-		raster_desc.DepthBiasClamp = 0.0f;
-		raster_desc.DepthClipEnable = true;
-		raster_desc.FillMode = D3D11_FILL_SOLID;
-		raster_desc.FrontCounterClockwise = false;
-		raster_desc.MultisampleEnable = false;
-		raster_desc.ScissorEnable = false;
-		raster_desc.SlopeScaledDepthBias = 0.0f;
-
-		ID3D11RasterizerState* raster_state = nullptr;
-		THROW_FAILED(d3d_device_->CreateRasterizerState(&raster_desc, &raster_state));
-		d3d_raster_state_ = MakeCOMPtr(raster_state);
-
-		d3d_imm_ctx_->RSSetState(raster_state);
+		quad_ = this->MakeObject<Quad>();
 
 		this->Resize(width, height);
 
@@ -686,10 +871,8 @@ namespace epsilon
 		d3d_imm_ctx_->OMSetRenderTargets(0, 0, 0);
 		d3d_imm_ctx_->OMSetDepthStencilState(0, 0);
 
-		d3d_depth_stencil_view_.reset();
-		d3d_depth_stencil_state_.reset();
-		d3d_depth_stencil_buffer_.reset();
-		d3d_render_target_view_.reset();
+		gbuffer_pass_fb_.reset();
+		shading_pass_fb_.reset();
 
 		//SwapChain
 		IDXGISwapChain1* dxgi_sc = nullptr;
@@ -727,71 +910,16 @@ namespace epsilon
 			gi_swap_chain_1_ = MakeCOMPtr(dxgi_sc);
 		}
 
-		//Render target view
-		ID3D11Texture2D* back_buffer = nullptr;
-		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&back_buffer));
+		//Frame buffers
+		gbuffer_pass_fb_ = this->MakeObject<FrameBuffer>();
+		gbuffer_pass_fb_->Create(width_, height_, 2);
 
-		ID3D11RenderTargetView* d3d_render_target_view = nullptr;
-		THROW_FAILED(d3d_device_->CreateRenderTargetView(back_buffer, NULL, &d3d_render_target_view));
-		d3d_render_target_view_ = MakeCOMPtr(d3d_render_target_view);
-
-		back_buffer->Release();
-		back_buffer = nullptr;
-
-		//Depth stencil view
-		D3D11_TEXTURE2D_DESC depth_buffer_desc;
-		ZeroMemory(&depth_buffer_desc, sizeof(depth_buffer_desc));
-		depth_buffer_desc.Width = width_;
-		depth_buffer_desc.Height = height_;
-		depth_buffer_desc.MipLevels = 1;
-		depth_buffer_desc.ArraySize = 1;
-		depth_buffer_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depth_buffer_desc.SampleDesc.Count = 1;
-		depth_buffer_desc.SampleDesc.Quality = 0;
-		depth_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-		depth_buffer_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-		depth_buffer_desc.CPUAccessFlags = 0;
-		depth_buffer_desc.MiscFlags = 0;
-
-		ID3D11Texture2D* depth_stencil_buffer;
-		THROW_FAILED(d3d_device_->CreateTexture2D(&depth_buffer_desc, NULL, &depth_stencil_buffer));
-		d3d_depth_stencil_buffer_ = MakeCOMPtr(depth_stencil_buffer);
-
-		D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
-		ZeroMemory(&depth_stencil_desc, sizeof(depth_stencil_desc));
-		depth_stencil_desc.DepthEnable = true;
-		depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-		depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
-		depth_stencil_desc.StencilEnable = true;
-		depth_stencil_desc.StencilReadMask = 0xFF;
-		depth_stencil_desc.StencilWriteMask = 0xFF;
-		depth_stencil_desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-		depth_stencil_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
-		depth_stencil_desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-		depth_stencil_desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-		depth_stencil_desc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-		depth_stencil_desc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
-		depth_stencil_desc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-		depth_stencil_desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-
-		ID3D11DepthStencilState* depth_stencil_state = nullptr;
-		THROW_FAILED(d3d_device_->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state));
-		d3d_depth_stencil_state_ = MakeCOMPtr(depth_stencil_state);
-
-		d3d_imm_ctx_->OMSetDepthStencilState(depth_stencil_state, 1);
-
-		D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc;
-		ZeroMemory(&depth_stencil_view_desc, sizeof(depth_stencil_view_desc));
-		depth_stencil_view_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depth_stencil_view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-		depth_stencil_view_desc.Texture2D.MipSlice = 0;
-
-		ID3D11DepthStencilView* depth_stencil_view = nullptr;
-		THROW_FAILED(d3d_device_->CreateDepthStencilView(depth_stencil_buffer, &depth_stencil_view_desc, &depth_stencil_view));
-		d3d_depth_stencil_view_ = MakeCOMPtr(depth_stencil_view);
-
-		//Bind render target
-		d3d_imm_ctx_->OMSetRenderTargets(1, &d3d_render_target_view, depth_stencil_view);
+		ID3D11Texture2D* frame_buffer = nullptr;
+		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&frame_buffer));
+		shading_pass_fb_ = this->MakeObject<FrameBuffer>();
+		shading_pass_fb_->Create(width_, height_, frame_buffer);
+		frame_buffer->Release();
+		frame_buffer = nullptr;
 
 		//Viewport
 		D3D11_VIEWPORT viewport;
@@ -815,12 +943,12 @@ namespace epsilon
 			gi_swap_chain_1_->SetFullscreenState(false, nullptr);
 		}
 
+		gbuffer_pass_fb_.reset();
+		shading_pass_fb_.reset();
+
+		quad_.reset();
+
 		d3d_effect_.reset();
-		d3d_raster_state_.reset();
-		d3d_depth_stencil_view_.reset();
-		d3d_depth_stencil_state_.reset();
-		d3d_depth_stencil_buffer_.reset();
-		d3d_render_target_view_.reset();
 		d3d_imm_ctx_.reset();
 		d3d_device_.reset();
 
@@ -871,27 +999,52 @@ namespace epsilon
 
 	void RenderEngine::Frame()
 	{
-		float clean_color[4] = { 0.2f, 0.2f, 0.6f, 1 };
-		d3d_imm_ctx_->ClearRenderTargetView(d3d_render_target_view_.get(), clean_color);
-		d3d_imm_ctx_->ClearDepthStencilView(d3d_depth_stencil_view_.get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+		ID3DX11EffectTechnique* tech = d3d_effect_->GetTechniqueByName("DeferredRendering");
+
+		//GBuffer pass
+		ID3DX11EffectPass* pass = tech->GetPassByName("GBuffer");
+
+		gbuffer_pass_fb_->Clear();
+		gbuffer_pass_fb_->Bind();
 
 		cam_->Bind(d3d_effect_.get());
-
-		ID3DX11EffectTechnique* tech = d3d_effect_->GetTechniqueByIndex(0);
-		D3DX11_TECHNIQUE_DESC tech_desc;
-		THROW_FAILED(tech->GetDesc(&tech_desc));
-
-		for (uint32_t p = 0; p < tech_desc.Passes; ++p)
+		for (auto i = rs_.begin(); i != rs_.end(); i++)
 		{
-			ID3DX11EffectPass* pass = tech->GetPassByIndex(p);
-			for (auto i = rs_.begin(); i != rs_.end(); i++)
-			{
-				RenderablePtr r = *i;
-				r->Render(d3d_effect_.get(), pass);
-			}
+			RenderablePtr r = *i;
+			r->Render(d3d_effect_.get(), pass);
 		}
+		
+		//LightingAmbient pass
+		pass = tech->GetPassByName("LightingAmbient");
 
+		shading_pass_fb_->Clear();
+		shading_pass_fb_->Bind();
+
+		auto var_g_buffer_tex = d3d_effect_->GetVariableByName("g_buffer_tex")->AsShaderResource();
+		auto var_g_buffer_1_tex = d3d_effect_->GetVariableByName("g_buffer_1_tex")->AsShaderResource();
+		auto var_g_light_dir_es = d3d_effect_->GetVariableByName("g_light_dir_es")->AsVector();
+		auto var_g_light_attrib = d3d_effect_->GetVariableByName("g_light_attrib")->AsVector();
+		auto var_g_light_color = d3d_effect_->GetVariableByName("g_light_color")->AsVector();
+
+		var_g_buffer_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(0));
+		var_g_buffer_1_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(1));
+
+		Vector3f light_dir(1, 1, 1);
+		Vector4f light_attrib(1, 1, 0, 0);
+		Vector3f light_color(1.2f, 1.2f, 1.2f);
+
+		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
+		var_g_light_attrib->SetFloatVector((float*)&light_attrib);
+		var_g_light_color->SetFloatVector((float*)&light_color);
+
+		quad_->Render(d3d_effect_.get(), pass);
+		
 		gi_swap_chain_1_->Present(0, 0);
+	}
+
+	IDXGISwapChain1* RenderEngine::DXGISwapChain()
+	{
+		return gi_swap_chain_1_.get();
 	}
 
 	ID3D11Device* RenderEngine::D3DDevice()
@@ -935,6 +1088,50 @@ namespace epsilon
 			error_msgs.clear();
 		}
 		return hr;
+	}
+
+	ID3D11Texture2D* RenderEngine::D3DCreateTexture2D(UINT width, UINT height, DXGI_FORMAT fmt, UINT bind_flags)
+	{
+		D3D11_TEXTURE2D_DESC d3d_tex_desc;
+		ZeroMemory(&d3d_tex_desc, sizeof(d3d_tex_desc));
+		d3d_tex_desc.Width = width_;
+		d3d_tex_desc.Height = height_;
+		d3d_tex_desc.MipLevels = 1;
+		d3d_tex_desc.ArraySize = 1;
+		d3d_tex_desc.Format = fmt;
+		d3d_tex_desc.SampleDesc.Count = 1;
+		d3d_tex_desc.SampleDesc.Quality = 0;
+		d3d_tex_desc.Usage = D3D11_USAGE_DEFAULT;
+		d3d_tex_desc.BindFlags = bind_flags;
+		d3d_tex_desc.CPUAccessFlags = 0;
+		d3d_tex_desc.MiscFlags = 0;
+
+		ID3D11Texture2D* d3d_tex = nullptr;
+		THROW_FAILED(d3d_device_->CreateTexture2D(&d3d_tex_desc, NULL, &d3d_tex));
+
+		return d3d_tex;
+	}
+
+	ID3D11DepthStencilView* RenderEngine::D3DCreateDepthStencilView(ID3D11Texture2D* tex, DXGI_FORMAT fmt)
+	{
+		D3D11_DEPTH_STENCIL_VIEW_DESC d3d_dsv_desc;
+		ZeroMemory(&d3d_dsv_desc, sizeof(d3d_dsv_desc));
+		d3d_dsv_desc.Format = fmt;
+		d3d_dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+		d3d_dsv_desc.Texture2D.MipSlice = 0;
+
+		ID3D11DepthStencilView* d3d_dsv = nullptr;
+		THROW_FAILED(d3d_device_->CreateDepthStencilView(tex, &d3d_dsv_desc, &d3d_dsv));
+		
+		return d3d_dsv;
+	}
+
+	ID3D11RenderTargetView* RenderEngine::D3DCreateRenderTargetView(ID3D11Texture2D* tex)
+	{
+		ID3D11RenderTargetView* d3d_rtv = nullptr;
+		THROW_FAILED(d3d_device_->CreateRenderTargetView(tex, NULL, &d3d_rtv));
+		
+		return d3d_rtv;
 	}
 
 	Application::Application()
@@ -998,7 +1195,3 @@ namespace epsilon
 	}
 
 }
-
-
-#undef THR
-#undef TIF

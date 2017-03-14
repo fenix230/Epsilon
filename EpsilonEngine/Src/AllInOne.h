@@ -138,6 +138,7 @@ namespace epsilon
 
 	DEFINE_VECTOR_OPERATORS(Vector4f);
 
+
 	struct Matrix : public XMMATRIX
 	{
 		Matrix() 
@@ -306,7 +307,8 @@ namespace epsilon
 	DEFINE_SMART_POINTER(Renderable);
 	DEFINE_SMART_POINTER(StaticMesh);
 	DEFINE_SMART_POINTER(Camera);
-
+	DEFINE_SMART_POINTER(FrameBuffer);
+	DEFINE_SMART_POINTER(Quad);
 
 	struct REObject
 	{
@@ -380,10 +382,67 @@ namespace epsilon
 
 		std::vector<std::pair<ID3DX11EffectPass*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
 
-		ID3D11ResourcePtr d3d_tex_res_;
-		ID3D11ShaderResourceViewPtr d3d_tex_sr_view_;
+		ID3D11ResourcePtr d3d_tex_;
+		ID3D11ShaderResourceViewPtr d3d_srv_;
 
 		Vector3f ka_, kd_, ks_;
+	};
+
+
+	class Quad : public Renderable
+	{
+	public:
+		Quad();
+		virtual ~Quad();
+
+		virtual void Render(ID3DX11Effect* effect, ID3DX11EffectPass* pass) override;
+
+		void Destory();
+
+	private:
+		ID3D11InputLayout* D3DInputLayout(ID3DX11EffectPass* pass);
+
+	private:
+		ID3D11BufferPtr d3d_vertex_buffer_;
+
+		std::vector<std::pair<ID3DX11EffectPass*, ID3D11InputLayoutPtr>> d3d_input_layouts_;
+	};
+
+
+	class FrameBuffer : public REObject
+	{
+	public:
+		FrameBuffer();
+		virtual ~FrameBuffer();
+
+		void Create(uint32_t width, uint32_t height, ID3D11Texture2D* sc_buffer);
+
+		void Create(uint32_t width, uint32_t height, size_t rtv_count);
+
+		void Create(uint32_t width, uint32_t height, size_t rtv_count, ID3D11Texture2D* sc_buffer, size_t sc_index);
+
+		void Destory();
+
+		void Clear(Vector4f* c = nullptr);
+
+		void Bind();
+
+		ID3D11ShaderResourceView* RetriveShaderResourceView(size_t index);
+
+	private:
+		DXGI_FORMAT rtv_fmt_;
+		DXGI_FORMAT dsv_fmt_;
+
+		struct RTV
+		{
+			ID3D11Texture2DPtr d3d_rtv_tex_;
+			ID3D11RenderTargetViewPtr d3d_rtv_;
+			ID3D11ShaderResourceViewPtr d3d_srv_;
+		};
+		std::vector<RTV> rtvs_;
+
+		ID3D11Texture2DPtr d3d_dsv_tex_;
+		ID3D11DepthStencilViewPtr d3d_dsv_;
 	};
 
 
@@ -414,12 +473,20 @@ namespace epsilon
 			return obj;
 		}
 
+		IDXGISwapChain1* DXGISwapChain();
+
 		ID3D11Device* D3DDevice();
 
 		ID3D11DeviceContext* D3DContext();
 
 		HRESULT D3DCompile(std::string const & src_data, const char* entry_point, const char* target,
 			std::vector<uint8_t>& code, std::string& error_msgs) const;
+
+		ID3D11Texture2D* D3DCreateTexture2D(UINT width, UINT height, DXGI_FORMAT fmt, UINT bind_flags);
+
+		ID3D11DepthStencilView* D3DCreateDepthStencilView(ID3D11Texture2D* tex, DXGI_FORMAT fmt);
+
+		ID3D11RenderTargetView* D3DCreateRenderTargetView(ID3D11Texture2D* tex);
 
 	private:
 		HWND wnd_;
@@ -448,13 +515,12 @@ namespace epsilon
 		ID3D11DevicePtr d3d_device_;
 		ID3D11DeviceContextPtr d3d_imm_ctx_;
 
-		ID3D11RenderTargetViewPtr d3d_render_target_view_;
-		ID3D11Texture2DPtr d3d_depth_stencil_buffer_;
-		ID3D11DepthStencilStatePtr d3d_depth_stencil_state_;
-		ID3D11DepthStencilViewPtr d3d_depth_stencil_view_;
-		ID3D11RasterizerStatePtr d3d_raster_state_;
+		FrameBufferPtr gbuffer_pass_fb_;
+		FrameBufferPtr shading_pass_fb_;
 
 		ID3DX11EffectPtr d3d_effect_;
+
+		QuadPtr quad_;
 
 		CameraPtr cam_;
 		std::vector<RenderablePtr> rs_;

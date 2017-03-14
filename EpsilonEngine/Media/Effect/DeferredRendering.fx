@@ -32,14 +32,6 @@ SamplerState point_sampler
 };
 
 
-SamplerState aniso_sampler
-{
-	Filter = ANISOTROPIC;
-	AddressU = Wrap;
-	AddressV = Wrap;
-};
-
-
 SamplerState linear_sampler
 {
 	Filter = MIN_MAG_LINEAR_MIP_POINT;
@@ -48,11 +40,53 @@ SamplerState linear_sampler
 };
 
 
+SamplerState aniso_sampler
+{
+	Filter = ANISOTROPIC;
+	AddressU = Wrap;
+	AddressV = Wrap;
+};
+
+
 DepthStencilState depth_enalbed
 {
-	DepthEnable = TRUE;
+	DepthEnable = true;
 	DepthWriteMask = ALL;
 	DepthFunc = LESS_EQUAL;
+};
+
+
+DepthStencilState lighting_dss
+{
+	DepthEnable = FALSE;
+	DepthWriteMask = ZERO;
+
+	FRONTFACESTENCILFAIL = true;
+	FRONTFACESTENCILFUNC = NOT_EQUAL;
+	FRONTFACESTENCILPASS = KEEP;
+
+	BACKFACESTENCILFAIL = true;
+	BACKFACESTENCILFUNC = NOT_EQUAL;
+	BACKFACESTENCILPASS = KEEP;
+};
+
+
+RasterizerState lighting_rs
+{
+	FillMode = Solid;
+	CullMode = FRONT;
+};
+
+
+BlendState lighting_bs
+{
+	BLENDENABLE[0] = true;
+	SRCBLEND = ONE;
+	DESTBLEND = ONE;
+	BLENDOP = ADD;
+	SRCBLENDALPHA = ONE;
+	DESTBLENDALPHA = ONE;
+	BLENDOPALPHA = ADD;
 };
 
 
@@ -133,6 +167,32 @@ float Shininess2Glossiness(float shininess)
 float Glossiness2Shininess(float glossiness)
 {
 	return pow(MAX_SHININESS, glossiness);
+}
+
+
+float3 FresnelTerm(float3 light_vec, float3 halfway_vec, float3 c_spec)
+{
+	float e_n = saturate(dot(light_vec, halfway_vec));
+	return c_spec > 0 ? c_spec + (1 - c_spec) * exp2(-(5.55473f * e_n + 6.98316f) * e_n) : 0;
+}
+
+
+float SpecularNormalizeFactor(float shininess)
+{
+	return (shininess + 2) / 8;
+}
+
+
+float3 DistributionTerm(float3 halfway_vec, float3 normal, float shininess)
+{
+	return exp((shininess + 0.775f) * (max(dot(halfway_vec, normal), 0.0f) - 1));
+}
+
+
+float3 SpecularTerm(float3 c_spec, float3 light_vec, float3 halfway_vec, float3 normal, float shininess)
+{
+	return SpecularNormalizeFactor(shininess) * DistributionTerm(halfway_vec, normal, shininess)
+		* FresnelTerm(light_vec, halfway_vec, c_spec);
 }
 
 
@@ -227,6 +287,21 @@ LIGHTING_VSO LightingVS(float4 pos : POSITION)
 }
 
 
+float4 LightingTestPS(LIGHTING_VSO ipt) : SV_Target
+{
+	float2 tc = ipt.tc;
+	float3 view_dir = ipt.view_dir;
+
+	float4 mrt_1 = g_buffer_1_tex.Sample(point_sampler, tc);
+
+	float3 c_diff = GetDiffuse(mrt_1);
+
+	float4 shading = float4(c_diff, 1);
+
+	return shading;
+}
+
+
 float4 LightingAmbientPS(LIGHTING_VSO ipt) : SV_Target
 {
 	float2 tc = ipt.tc;
@@ -262,7 +337,7 @@ float4 LightingSunPS(LIGHTING_VSO ipt) : SV_Target
 	float4 mrt_0 = g_buffer_tex.Sample(point_sampler, tc);
 	float3 normal = GetNormal(mrt_0);
 
-	float3 dir = light_dir_es.xyz;
+	float3 dir = g_light_dir_es.xyz;
 	float n_dot_l = dot(normal, dir);
 	if (n_dot_l > 0)
 	{
@@ -276,7 +351,7 @@ float4 LightingSunPS(LIGHTING_VSO ipt) : SV_Target
 
 		float3 halfway = normalize(dir - view_dir);
 		float3 spec = SpecularTerm(c_spec, dir, halfway, normal, shininess);
-		shading = max((c_diff * light_attrib.x + spec * light_attrib.y) * n_dot_l, 0) * light_color.rgb;
+		shading = max((c_diff * g_light_attrib.x + spec * g_light_attrib.y) * n_dot_l, 0) * g_light_color.rgb;
 	}
 
 	return float4(shading, 1);
@@ -290,5 +365,22 @@ technique11 DeferredRendering
 		SetVertexShader(CompileShader(vs_5_0, GBufferVS()));
 		SetPixelShader(CompileShader(ps_5_0, GBufferPS()));
 		SetDepthStencilState(depth_enalbed, 0);
+	}
+
+	pass LightingAmbient
+	{
+		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
+		SetPixelShader(CompileShader(ps_5_0, LightingAmbientPS()));
+		SetRasterizerState(lighting_rs);
+		SetDepthStencilState(lighting_dss, 128);
+	}
+
+	pass LightingSun
+	{
+		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
+		SetPixelShader(CompileShader(ps_5_0, LightingSunPS()));
+		SetRasterizerState(lighting_rs);
+		SetDepthStencilState(lighting_dss, 128);
+		SetBlendState(lighting_bs, float4(1,1,1,1), 0xffffffff);
 	}
 }

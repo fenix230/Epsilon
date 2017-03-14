@@ -55,10 +55,8 @@
     <None Include="..\Media\Effect\Shading.fx">
       <Filter>头文件\Effects</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\Media\Effect\DeferredRendering.fx">
+    <None Include="..\Media\Effect\DeferredRendering.fx">
       <Filter>头文件\Effects</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>
