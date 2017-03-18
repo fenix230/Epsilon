@@ -425,9 +425,11 @@ namespace epsilon
 
 			ID3D11Resource* d3d_tex_res = nullptr;
 			ID3D11ShaderResourceView* d3d_tex_srv = nullptr;
-			THROW_FAILED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_srv));
-			d3d_tex_ = MakeCOMPtr(d3d_tex_res);
-			d3d_srv_ = MakeCOMPtr(d3d_tex_srv);
+			if (SUCCEEDED(CreateDDSTextureFromFile(re_->D3DDevice(), wfile_path.c_str(), &d3d_tex_res, &d3d_tex_srv)))
+			{
+				d3d_tex_ = MakeCOMPtr(d3d_tex_res);
+				d3d_srv_ = MakeCOMPtr(d3d_tex_srv);
+			}
 		}
 
 		ka_ = ka;
@@ -502,7 +504,8 @@ namespace epsilon
 		}
 
 		auto var_g_albedo_clr = effect->GetVariableByName("g_albedo_clr")->AsVector();
-		var_g_albedo_clr->SetFloatVector((float*)&ka_);
+		Vector3f albedo_clr(0.58f, 0.58f, 0.58f);
+		var_g_albedo_clr->SetFloatVector((float*)&albedo_clr);
 
 		auto var_g_metalness_clr = effect->GetVariableByName("g_metalness_clr")->AsVector();
 		Vector2f metalness_clr(0.02f, 0);
@@ -639,10 +642,14 @@ namespace epsilon
 		auto var_g_model_mat = effect->GetVariableByName("g_model_mat")->AsMatrix();
 		auto var_g_view_mat = effect->GetVariableByName("g_view_mat")->AsMatrix();
 		auto var_g_proj_mat = effect->GetVariableByName("g_proj_mat")->AsMatrix();
+		auto var_g_inv_proj_mat = effect->GetVariableByName("g_inv_proj_mat")->AsMatrix();
 
 		var_g_model_mat->SetMatrix((float*)&world_);
 		var_g_view_mat->SetMatrix((float*)&view_);
 		var_g_proj_mat->SetMatrix((float*)&proj_);
+
+		Matrix inv_proj = proj_.Inverse();
+		var_g_inv_proj_mat->SetMatrix((float*)&inv_proj);
 	}
 
 	void Camera::LookAt(Vector3f pos, Vector3f target, Vector3f up)
@@ -872,7 +879,8 @@ namespace epsilon
 		d3d_imm_ctx_->OMSetDepthStencilState(0, 0);
 
 		gbuffer_pass_fb_.reset();
-		ambient_pass_fb_.reset();
+		lighting_pass_fb_.reset();
+		srgb_pass_fb_.reset();
 
 		//SwapChain
 		IDXGISwapChain1* dxgi_sc = nullptr;
@@ -914,14 +922,14 @@ namespace epsilon
 		gbuffer_pass_fb_ = this->MakeObject<FrameBuffer>();
 		gbuffer_pass_fb_->Create(width_, height_, 2);
 
+		lighting_pass_fb_ = this->MakeObject<FrameBuffer>();
+		lighting_pass_fb_->Create(width_, height_, 1);
+
 		ID3D11Texture2D* frame_buffer = nullptr;
 		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&frame_buffer));
 
-		ambient_pass_fb_ = this->MakeObject<FrameBuffer>();
-		ambient_pass_fb_->Create(width_, height_, frame_buffer);
-
-		sun_pass_fb_ = this->MakeObject<FrameBuffer>();
-		sun_pass_fb_->Create(width_, height_, frame_buffer);
+		srgb_pass_fb_ = this->MakeObject<FrameBuffer>();
+		srgb_pass_fb_->Create(width_, height_, frame_buffer);
 
 		frame_buffer->Release();
 		frame_buffer = nullptr;
@@ -949,8 +957,8 @@ namespace epsilon
 		}
 
 		gbuffer_pass_fb_.reset();
-		ambient_pass_fb_.reset();
-		sun_pass_fb_.reset();
+		lighting_pass_fb_.reset();
+		srgb_pass_fb_.reset();
 
 		quad_.reset();
 
@@ -1023,8 +1031,8 @@ namespace epsilon
 		//LightingAmbient pass
 		pass = tech->GetPassByName("LightingAmbient");
 
-		ambient_pass_fb_->Clear();
-		ambient_pass_fb_->Bind();
+		lighting_pass_fb_->Clear();
+		lighting_pass_fb_->Bind();
 
 		auto var_g_buffer_tex = d3d_effect_->GetVariableByName("g_buffer_tex")->AsShaderResource();
 		auto var_g_buffer_1_tex = d3d_effect_->GetVariableByName("g_buffer_1_tex")->AsShaderResource();
@@ -1035,9 +1043,10 @@ namespace epsilon
 		var_g_buffer_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(0));
 		var_g_buffer_1_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(1));
 
-		Vector3f light_dir(1, 1, 1);
+		Vector3f light_dir(0, 1, 0);
+		light_dir = TransformNormal(light_dir, cam_->view_);
 		Vector4f light_attrib(1, 1, 0, 0);
-		Vector3f light_color(0.2f, 0.2f, 0.2f);
+		Vector3f light_color(0.1f, 0.1f, 0.1f);
 
 		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
 		var_g_light_attrib->SetFloatVector((float*)&light_attrib);
@@ -1046,11 +1055,24 @@ namespace epsilon
 		quad_->Render(d3d_effect_.get(), pass);
 
 		//LightingSun pass
-		pass = tech->GetPassByName("LightingSun");
+		/*pass = tech->GetPassByName("LightingSun");
 
+		light_dir = Normalize(cam_->look_at_ - cam_->eye_pos_);
 		light_color = Vector3f(1, 1, 1);
+		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
 		var_g_light_color->SetFloatVector((float*)&light_color);
 		
+		quad_->Render(d3d_effect_.get(), pass);*/
+
+		//SRGBCorrection pass
+		srgb_pass_fb_->Clear();
+		srgb_pass_fb_->Bind();
+
+		pass = tech->GetPassByName("SRGBCorrection");
+
+		auto var_g_pp_tex = d3d_effect_->GetVariableByName("g_pp_tex")->AsShaderResource();
+		var_g_pp_tex->SetResource(lighting_pass_fb_->RetriveShaderResourceView(0));
+
 		quad_->Render(d3d_effect_.get(), pass);
 
 		gi_swap_chain_1_->Present(0, 0);

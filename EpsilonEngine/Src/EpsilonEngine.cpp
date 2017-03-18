@@ -76,7 +76,7 @@ void GenerateCube(StaticMeshPtr r)
 }
 
 
-void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
+void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path, float scale = 1, bool inverse_z = false, bool swap_yz = false)
 {
 	aiPropertyStore* props = aiCreatePropertyStore();
 	aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_TER_MAKE_UVS, 1);
@@ -96,6 +96,13 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		| aiProcess_ConvertToLeftHanded // convert everything to D3D left handed space
 		| aiProcess_FixInfacingNormals, // find normals facing inwards and inverts them
 		nullptr, props);
+
+	if (!scene)
+	{
+		printf("%s\n", aiGetErrorString());
+		getchar();
+		return;
+	}
 
 	auto pp = _FSPFX path(file_path).parent_path();
 
@@ -154,10 +161,29 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		for (unsigned int vi = 0; vi < mesh->mNumVertices; ++vi)
 		{
 			pos_data[vi] = Vector3f(&mesh->mVertices[vi].x);
+			pos_data[vi] = pos_data[vi] * scale;
+			
+			if (inverse_z)
+			{
+				pos_data[vi].z *= -1;
+			}
+			if (swap_yz)
+			{
+				std::swap(pos_data[vi].y, pos_data[vi].z);
+			}
 
 			if (mesh->mNormals)
 			{
 				norm_data[vi] = Vector3f(&mesh->mNormals[vi].x);
+
+				if (inverse_z)
+				{
+					norm_data[vi].z *= -1;
+				}
+				if (swap_yz)
+				{
+					std::swap(norm_data[vi].y, norm_data[vi].z);
+				}
 			}
 
 			if (mesh->mTextureCoords && mesh->mTextureCoords[0])
@@ -172,7 +198,6 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path)
 		r->CreateMaterial(tex_path, ka, kd, ks);
 		re.AddRenderable(r);
 	}
-
 }
 
 
@@ -180,8 +205,8 @@ int main()
 {
 	try
 	{
-		int width = 1600;
-		int height = 900;
+		int width = 1280;
+		int height = 720;
 
 		Application app;
 		app.Create("Test", width, height);
@@ -189,9 +214,9 @@ int main()
 		RenderEngine& re = app.RE();
 
 		CameraPtr cam = std::make_shared<Camera>();
-		Vector3f eye(-30, 12, 0), at(40, 15, 0), up(0, 1, 0);
+		Vector3f eye(-14.5f, 18, -3), at(-13.6f, 17.55f, -2.8f), up(0, 1, 0);
 		cam->LookAt(eye, at, up);
-		cam->Perspective(XM_PI * 0.6f, (float)width / (float)height, 1, 500);
+		cam->Perspective(XM_PI / 4, (float)width / (float)height, 0.1f, 500);
 		re.SetCamera(cam);
 
 		LoadAssimpStaticMesh(re, "../../../Media/Model/Sponza/sponza.obj");

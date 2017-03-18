@@ -154,6 +154,11 @@ namespace epsilon
 		explicit Matrix(const float *arr) : XMMATRIX(arr) {}
 
 		Matrix& operator= (const XMMATRIX& m) { *(XMMATRIX*)this = m; return *this; }
+
+		inline Matrix Inverse() const
+		{
+			return Matrix().operator=(XMMatrixInverse(nullptr, *this));
+		}
 	};
 
 
@@ -180,6 +185,31 @@ namespace epsilon
 	inline Vector2f TransformNormal(const Vector2f& v, const Matrix& mat)
 	{
 		return Vector2f().XMV(XMVector2TransformNormal(v.XMV(), mat));
+	}
+
+	inline Vector4f Normalize(const Vector4f& v)
+	{
+		return Vector4f().XMV(XMVector4Normalize(v.XMV()));
+	}
+
+	inline Vector3f Normalize(const Vector3f& v)
+	{
+		return Vector3f().XMV(XMVector3Normalize(v.XMV()));
+	}
+
+	inline Vector2f Normalize(const Vector2f& v)
+	{
+		return Vector2f().XMV(XMVector2Normalize(v.XMV()));
+	}
+
+	inline float Length(const Vector2f& v) 
+	{
+		return ::sqrt(v.x * v.x + v.y * v.y);
+	}
+
+	inline float Length(const Vector3f& v) 
+	{
+		return ::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 	}
 
 
@@ -516,8 +546,8 @@ namespace epsilon
 		ID3D11DeviceContextPtr d3d_imm_ctx_;
 
 		FrameBufferPtr gbuffer_pass_fb_;
-		FrameBufferPtr ambient_pass_fb_;
-		FrameBufferPtr sun_pass_fb_;
+		FrameBufferPtr lighting_pass_fb_;
+		FrameBufferPtr srgb_pass_fb_;
 
 		ID3DX11EffectPtr d3d_effect_;
 

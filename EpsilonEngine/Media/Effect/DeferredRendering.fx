@@ -20,6 +20,7 @@ float3		g_light_dir_es;
 float4		g_light_attrib;
 float4		g_light_color;
 
+Texture2D	g_pp_tex;
 
 #define MAX_SHININESS 8192.0f
 
@@ -71,10 +72,24 @@ DepthStencilState lighting_dss
 };
 
 
-RasterizerState lighting_rs
+RasterizerState back_solid_rs
+{
+	FillMode = Solid;
+	CullMode = BACK;
+};
+
+
+RasterizerState front_solid_rs
 {
 	FillMode = Solid;
 	CullMode = FRONT;
+};
+
+
+RasterizerState double_solid_rs
+{
+	FillMode = Solid;
+	CullMode = NONE;
 };
 
 
@@ -317,7 +332,6 @@ float4 LightingAmbientPS(LIGHTING_VSO ipt) : SV_Target
 	float3 c_spec = GetSpecular(mrt_1);
 
 	float n_dot_l = 0.5f + 0.5f * dot(g_light_dir_es.xyz, normal);
-	float3 halfway = normalize(g_light_dir_es.xyz - view_dir);
 	float4 shading = float4(max(c_diff * g_light_attrib.x * n_dot_l, 0) * g_light_color.rgb, 1);
 
 	return shading;
@@ -358,12 +372,55 @@ float4 LightingSunPS(LIGHTING_VSO ipt) : SV_Target
 }
 
 
+float3 linear_to_srgb(float3 rgb)
+{
+	const float ALPHA = 0.055f;
+	return rgb < 0.0031308f ? 12.92f * rgb : (1 + ALPHA) * pow(rgb, 1 / 2.4f) - ALPHA;
+}
+
+
+float2 TexCoordFromPos(float4 pos)
+{
+	float2 tex = pos.xy / 2;
+	tex.y *= -1;
+	tex += 0.5f;
+	return tex;
+}
+
+
+struct PP_VSO
+{
+	float4 pos : SV_Position;
+	float2 tc : TEXCOORD0;
+};
+
+
+PP_VSO PostProcessVS(float4 pos : POSITION)
+{
+	PP_VSO opt;
+
+	opt.pos = pos;
+	opt.tc = TexCoordFromPos(pos);
+
+	return opt;
+}
+
+
+float4 SRGBCorrectionPS(PP_VSO ipt) : SV_Target
+{
+	float3 rgb = g_pp_tex.Sample(linear_sampler, ipt.tc).xyz;
+	rgb = linear_to_srgb(max(rgb, 1e-6f));
+	return float4(rgb, 1);
+}
+
+
 technique11 DeferredRendering
 {
 	pass GBuffer
 	{
 		SetVertexShader(CompileShader(vs_5_0, GBufferVS()));
 		SetPixelShader(CompileShader(ps_5_0, GBufferPS()));
+		SetRasterizerState(back_solid_rs);
 		SetDepthStencilState(depth_enalbed, 0);
 	}
 
@@ -371,7 +428,7 @@ technique11 DeferredRendering
 	{
 		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
 		SetPixelShader(CompileShader(ps_5_0, LightingAmbientPS()));
-		SetRasterizerState(lighting_rs);
+		SetRasterizerState(front_solid_rs);
 		SetDepthStencilState(lighting_dss, 128);
 	}
 
@@ -379,8 +436,16 @@ technique11 DeferredRendering
 	{
 		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
 		SetPixelShader(CompileShader(ps_5_0, LightingSunPS()));
-		SetRasterizerState(lighting_rs);
+		SetRasterizerState(front_solid_rs);
 		SetDepthStencilState(lighting_dss, 128);
 		SetBlendState(lighting_bs, float4(1,1,1,1), 0xffffffff);
+	}
+
+	pass SRGBCorrection
+	{
+		SetVertexShader(CompileShader(vs_5_0, PostProcessVS()));
+		SetPixelShader(CompileShader(ps_5_0, SRGBCorrectionPS()));
+		SetRasterizerState(front_solid_rs);
+		SetDepthStencilState(depth_enalbed, 0);
 	}
 }
