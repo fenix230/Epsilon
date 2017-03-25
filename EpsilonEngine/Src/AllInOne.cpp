@@ -556,10 +556,10 @@ namespace epsilon
 		{
 			Vector3f vs_inputs[] =
 			{
-				Vector3f(+1, +1, 1),
 				Vector3f(-1, +1, 1),
-				Vector3f(+1, -1, 1),
-				Vector3f(-1, -1, 1)
+				Vector3f(+1, +1, 1),
+				Vector3f(-1, -1, 1),
+				Vector3f(+1, -1, 1)
 			};
 
 			D3D11_BUFFER_DESC buffer_desc;
@@ -733,7 +733,7 @@ namespace epsilon
 
 	void FrameBuffer::Clear(Vector4f* c)
 	{
-		float clean_color[4] = { 0, 0, 0, 1 };
+		float clean_color[4] = { 0, 0, 0, 0 };
 		float* pc = (c != nullptr ? (float*)c : clean_color);
 
 		for (size_t i = 0; i != rtvs_.size(); i++)
@@ -1031,7 +1031,8 @@ namespace epsilon
 		//LightingAmbient pass
 		pass = tech->GetPassByName("LightingAmbient");
 
-		lighting_pass_fb_->Clear();
+		Vector4f cc(0, 0, 0, 0);
+		lighting_pass_fb_->Clear(&cc);
 		lighting_pass_fb_->Bind();
 
 		auto var_g_buffer_tex = d3d_effect_->GetVariableByName("g_buffer_tex")->AsShaderResource();
@@ -1055,14 +1056,14 @@ namespace epsilon
 		quad_->Render(d3d_effect_.get(), pass);
 
 		//LightingSun pass
-		/*pass = tech->GetPassByName("LightingSun");
+		pass = tech->GetPassByName("LightingSun");
 
 		light_dir = Normalize(cam_->look_at_ - cam_->eye_pos_);
 		light_color = Vector3f(1, 1, 1);
 		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
 		var_g_light_color->SetFloatVector((float*)&light_color);
 		
-		quad_->Render(d3d_effect_.get(), pass);*/
+		quad_->Render(d3d_effect_.get(), pass);
 
 		//SRGBCorrection pass
 		srgb_pass_fb_->Clear();

@@ -59,7 +59,7 @@ DepthStencilState depth_enalbed
 
 DepthStencilState lighting_dss
 {
-	DepthEnable = FALSE;
+	DepthEnable = false;
 	DepthWriteMask = ZERO;
 
 	FRONTFACESTENCILFAIL = true;
@@ -95,14 +95,23 @@ RasterizerState double_solid_rs
 
 BlendState lighting_bs
 {
-	BLENDENABLE[0] = true;
-	SRCBLEND = ONE;
-	DESTBLEND = ONE;
-	BLENDOP = ADD;
-	SRCBLENDALPHA = ONE;
-	DESTBLENDALPHA = ONE;
-	BLENDOPALPHA = ADD;
+	BlendEnable[0] = TRUE;
+	SrcBlend = ONE;
+	DestBlend = ONE;
+	BlendOp = ADD;
+	SrcBlendAlpha = ONE;
+	DestBlendAlpha = ONE;
+	BlendOpAlpha = ADD;
+	RenderTargetWriteMask[0] = 0xF;
 };
+
+
+BlendState no_bs
+{
+	AlphaToCoverageEnable = FALSE;
+	BlendEnable[0] = FALSE;
+};
+
 
 
 float4 StoreGBufferRT0(float3 normal, float glossiness)
@@ -368,6 +377,8 @@ float4 LightingSunPS(LIGHTING_VSO ipt) : SV_Target
 		shading = max((c_diff * g_light_attrib.x + spec * g_light_attrib.y) * n_dot_l, 0) * g_light_color.rgb;
 	}
 
+	shading = clamp(shading, 0.0, 0.3);
+
 	return float4(shading, 1);
 }
 
@@ -408,8 +419,8 @@ PP_VSO PostProcessVS(float4 pos : POSITION)
 
 float4 SRGBCorrectionPS(PP_VSO ipt) : SV_Target
 {
-	float3 rgb = g_pp_tex.Sample(linear_sampler, ipt.tc).xyz;
-	rgb = linear_to_srgb(max(rgb, 1e-6f));
+	float4 c = g_pp_tex.Sample(linear_sampler, ipt.tc);
+	float3 rgb = linear_to_srgb(max(c.rgb, 1e-6f));
 	return float4(rgb, 1);
 }
 
@@ -420,32 +431,39 @@ technique11 DeferredRendering
 	{
 		SetVertexShader(CompileShader(vs_5_0, GBufferVS()));
 		SetPixelShader(CompileShader(ps_5_0, GBufferPS()));
+
 		SetRasterizerState(back_solid_rs);
 		SetDepthStencilState(depth_enalbed, 0);
+		SetBlendState(no_bs, float4(0, 0, 0, 0), 0xFFFFFFFF);
 	}
 
 	pass LightingAmbient
 	{
 		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
 		SetPixelShader(CompileShader(ps_5_0, LightingAmbientPS()));
-		SetRasterizerState(front_solid_rs);
-		SetDepthStencilState(lighting_dss, 128);
+
+		SetRasterizerState(back_solid_rs);
+		SetDepthStencilState(lighting_dss, 0);
+		SetBlendState(lighting_bs, float4(1, 1, 1, 1), 0xFFFFFFFF);
 	}
 
 	pass LightingSun
 	{
 		SetVertexShader(CompileShader(vs_5_0, LightingVS()));
 		SetPixelShader(CompileShader(ps_5_0, LightingSunPS()));
-		SetRasterizerState(front_solid_rs);
-		SetDepthStencilState(lighting_dss, 128);
-		SetBlendState(lighting_bs, float4(1,1,1,1), 0xffffffff);
+
+		SetRasterizerState(back_solid_rs);
+		SetDepthStencilState(lighting_dss, 0);
+		SetBlendState(lighting_bs, float4(1, 1, 1, 1), 0xFFFFFFFF);
 	}
 
 	pass SRGBCorrection
 	{
 		SetVertexShader(CompileShader(vs_5_0, PostProcessVS()));
 		SetPixelShader(CompileShader(ps_5_0, SRGBCorrectionPS()));
-		SetRasterizerState(front_solid_rs);
+
+		SetRasterizerState(back_solid_rs);
 		SetDepthStencilState(depth_enalbed, 0);
+		SetBlendState(no_bs, float4(0, 0, 0, 0), 0xFFFFFFFF);
 	}
 }
