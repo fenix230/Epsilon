@@ -2,12 +2,14 @@
 //
 
 #include "stdafx.h"
-#include "AllInOne.h"
+#include "Application.h"
 #include <filesystem>
 #include <assimp\config.h>
 #include <assimp\cimport.h>
 #include <assimp\postprocess.h>
 #include <assimp\scene.h>
+#include "Renderable.h"
+#include "Camera.h"
 
 
 using namespace epsilon;

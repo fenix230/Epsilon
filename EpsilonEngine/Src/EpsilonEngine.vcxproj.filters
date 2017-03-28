@@ -30,11 +30,35 @@
     <ClInclude Include="targetver.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="AllInOne.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="DDSTextureLoader\DDSTextureLoader.h">
       <Filter>源文件\DDSTextureLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D11Predeclare.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Window.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RSPredeclare.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderEngine.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameBuffer.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -44,19 +68,35 @@
     <ClCompile Include="EpsilonEngine.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="AllInOne.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="DDSTextureLoader\DDSTextureLoader.cpp">
       <Filter>源文件\DDSTextureLoader</Filter>
     </ClCompile>
+    <ClCompile Include="Window.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderEngine.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderable.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameBuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Media\Effect\Shading.fx">
-      <Filter>头文件\Effects</Filter>
-    </None>
     <None Include="..\Media\Effect\DeferredRendering.fx">
       <Filter>头文件\Effects</Filter>
     </None>
+    <None Include="Window" />
   </ItemGroup>
 </Project>
