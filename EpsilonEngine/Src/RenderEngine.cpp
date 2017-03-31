@@ -12,6 +12,7 @@
 #include "FrameBuffer.h"
 #include "Camera.h"
 #include "Renderable.h"
+#include "Light.h"
 
 
 namespace epsilon
@@ -121,7 +122,8 @@ namespace epsilon
 		d3d_device_ = MakeCOMPtr(d3d_device);
 		d3d_imm_ctx_ = MakeCOMPtr(d3d_imm_ctx);
 
-		quad_ = this->MakeObject<Quad>();
+		quad_ = std::make_shared<Quad>();
+		quad_->SetRE(*this);
 
 		this->Resize(width, height);
 
@@ -136,9 +138,9 @@ namespace epsilon
 		d3d_imm_ctx_->OMSetRenderTargets(0, 0, 0);
 		d3d_imm_ctx_->OMSetDepthStencilState(0, 0);
 
-		gbuffer_pass_fb_.reset();
-		lighting_pass_fb_.reset();
-		srgb_pass_fb_.reset();
+		gbuffer_fb_.reset();
+		lighting_fb_.reset();
+		srgb_fb_.reset();
 
 		//SwapChain
 		IDXGISwapChain1* dxgi_sc = nullptr;
@@ -177,17 +179,24 @@ namespace epsilon
 		}
 
 		//Frame buffers
-		gbuffer_pass_fb_ = this->MakeObject<FrameBuffer>();
-		gbuffer_pass_fb_->Create(width_, height_, 2);
+		gbuffer_fb_ = std::make_shared<FrameBuffer>();
+		gbuffer_fb_->SetRE(*this);
+		gbuffer_fb_->Create(width_, height_, 2);
 
-		lighting_pass_fb_ = this->MakeObject<FrameBuffer>();
-		lighting_pass_fb_->Create(width_, height_, 1);
+		linear_depth_fb_ = std::make_shared<FrameBuffer>(DXGI_FORMAT_R32_FLOAT);
+		linear_depth_fb_->SetRE(*this);
+		linear_depth_fb_->Create(width_, height_, 1);
+
+		lighting_fb_ = std::make_shared<FrameBuffer>();
+		lighting_fb_->SetRE(*this);
+		lighting_fb_->Create(width_, height_, 1);
 
 		ID3D11Texture2D* frame_buffer = nullptr;
 		THROW_FAILED(dxgi_sc->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&frame_buffer));
 
-		srgb_pass_fb_ = this->MakeObject<FrameBuffer>();
-		srgb_pass_fb_->Create(width_, height_, frame_buffer);
+		srgb_fb_ = std::make_shared<FrameBuffer>();
+		srgb_fb_->SetRE(*this);
+		srgb_fb_->Create(width_, height_, frame_buffer);
 
 		frame_buffer->Release();
 		frame_buffer = nullptr;
@@ -214,9 +223,10 @@ namespace epsilon
 			gi_swap_chain_1_->SetFullscreenState(false, nullptr);
 		}
 
-		gbuffer_pass_fb_.reset();
-		lighting_pass_fb_.reset();
-		srgb_pass_fb_.reset();
+		gbuffer_fb_.reset();
+		linear_depth_fb_.reset();
+		lighting_fb_.reset();
+		srgb_fb_.reset();
 
 		quad_.reset();
 
@@ -269,6 +279,21 @@ namespace epsilon
 		rs_.push_back(r);
 	}
 
+	void RenderEngine::SetAmbientLight(AmbientLightPtr al)
+	{
+		ambient_light_ = al;
+	}
+
+	void RenderEngine::AddDirectionLight(DirectionLightPtr dl)
+	{
+		dir_lights_.push_back(dl);
+	}
+
+	void RenderEngine::AddSpotLight(SpotLightPtr sl)
+	{
+		spot_lights_.push_back(sl);
+	}
+
 	void RenderEngine::Frame()
 	{
 		ID3DX11EffectTechnique* tech = d3d_effect_->GetTechniqueByName("DeferredRendering");
@@ -276,8 +301,8 @@ namespace epsilon
 		//GBuffer pass
 		ID3DX11EffectPass* pass = tech->GetPassByName("GBuffer");
 
-		gbuffer_pass_fb_->Clear();
-		gbuffer_pass_fb_->Bind();
+		gbuffer_fb_->Clear();
+		gbuffer_fb_->Bind();
 
 		cam_->Bind(d3d_effect_.get());
 		for (auto i = rs_.begin(); i != rs_.end(); i++)
@@ -286,51 +311,69 @@ namespace epsilon
 			r->Render(d3d_effect_.get(), pass);
 		}
 
-		//LightingAmbient pass
-		pass = tech->GetPassByName("LightingAmbient");
+		//Linear depth pass
+		pass = tech->GetPassByName("LinearDepth");
 
-		Vector4f cc(0, 0, 0, 0);
-		lighting_pass_fb_->Clear(&cc);
-		lighting_pass_fb_->Bind();
+		linear_depth_fb_->Clear();
+		linear_depth_fb_->Bind();
+
+		auto var_g_pp_tex = d3d_effect_->GetVariableByName("g_pp_tex")->AsShaderResource();
+		auto var_g_near_q_far = d3d_effect_->GetVariableByName("g_near_q_far")->AsVector();
+
+		var_g_pp_tex->SetResource(gbuffer_fb_->RetriveDSShaderResourceView());
+
+		float q = cam_->far_plane_ / (cam_->far_plane_ - cam_->near_plane_);
+		Vector4f near_q_far(cam_->near_plane_ * q, q, cam_->far_plane_, 1 / cam_->far_plane_);
+		var_g_near_q_far->SetFloatVector((float*)&near_q_far);
+
+		quad_->Render(d3d_effect_.get(), pass);
+
+		//Lighting-kind passes
+		lighting_fb_->Clear();
+		lighting_fb_->Bind();
 
 		auto var_g_buffer_tex = d3d_effect_->GetVariableByName("g_buffer_tex")->AsShaderResource();
 		auto var_g_buffer_1_tex = d3d_effect_->GetVariableByName("g_buffer_1_tex")->AsShaderResource();
-		auto var_g_light_dir_es = d3d_effect_->GetVariableByName("g_light_dir_es")->AsVector();
-		auto var_g_light_attrib = d3d_effect_->GetVariableByName("g_light_attrib")->AsVector();
-		auto var_g_light_color = d3d_effect_->GetVariableByName("g_light_color")->AsVector();
+		var_g_buffer_tex->SetResource(gbuffer_fb_->RetriveRTShaderResourceView(0));
+		var_g_buffer_1_tex->SetResource(gbuffer_fb_->RetriveRTShaderResourceView(1));
 
-		var_g_buffer_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(0));
-		var_g_buffer_1_tex->SetResource(gbuffer_pass_fb_->RetriveShaderResourceView(1));
+		//Ambient lighting pass
+		pass = tech->GetPassByName("AmbientLighting");
 
-		Vector3f light_dir(0, 1, 0);
-		light_dir = TransformNormal(light_dir, cam_->view_);
-		Vector4f light_attrib(1, 1, 0, 0);
-		Vector3f light_color(0.1f, 0.1f, 0.1f);
-
-		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
-		var_g_light_attrib->SetFloatVector((float*)&light_attrib);
-		var_g_light_color->SetFloatVector((float*)&light_color);
+		ambient_light_->Bind(d3d_effect_.get(), cam_.get());
 
 		quad_->Render(d3d_effect_.get(), pass);
 
-		//LightingSun pass
-		pass = tech->GetPassByName("LightingSun");
+		//Direction lighting pass for each
+		pass = tech->GetPassByName("DirectionLighting");
 
-		light_dir = Normalize(cam_->look_at_ - cam_->eye_pos_);
-		light_color = Vector3f(1, 1, 1);
-		var_g_light_dir_es->SetFloatVector((float*)&light_dir);
-		var_g_light_color->SetFloatVector((float*)&light_color);
+		for (auto i : dir_lights_)
+		{
+			i->Bind(d3d_effect_.get(), cam_.get());
 
-		quad_->Render(d3d_effect_.get(), pass);
+			quad_->Render(d3d_effect_.get(), pass);
+		}
+
+		//Spot lighting pass for each
+		pass = tech->GetPassByName("SpotLighting");
+
+		auto var_g_depth_tex = d3d_effect_->GetVariableByName("g_depth_tex")->AsShaderResource();
+		var_g_depth_tex->SetResource(linear_depth_fb_->RetriveRTShaderResourceView(0));
+
+		for (auto i : spot_lights_)
+		{
+			i->Bind(d3d_effect_.get(), cam_.get());
+
+			quad_->Render(d3d_effect_.get(), pass);
+		}
 
 		//SRGBCorrection pass
-		srgb_pass_fb_->Clear();
-		srgb_pass_fb_->Bind();
+		srgb_fb_->Clear();
+		srgb_fb_->Bind();
 
 		pass = tech->GetPassByName("SRGBCorrection");
 
-		auto var_g_pp_tex = d3d_effect_->GetVariableByName("g_pp_tex")->AsShaderResource();
-		var_g_pp_tex->SetResource(lighting_pass_fb_->RetriveShaderResourceView(0));
+		var_g_pp_tex->SetResource(lighting_fb_->RetriveRTShaderResourceView(0));
 
 		quad_->Render(d3d_effect_.get(), pass);
 

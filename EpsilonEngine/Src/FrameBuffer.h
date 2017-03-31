@@ -12,6 +12,7 @@ namespace epsilon
 	{
 	public:
 		FrameBuffer();
+		FrameBuffer(int rtv_fmt);
 		virtual ~FrameBuffer();
 
 		INTERFACE_SET_RE;
@@ -28,11 +29,12 @@ namespace epsilon
 
 		void Bind();
 
-		ID3D11ShaderResourceView* RetriveShaderResourceView(size_t index);
+		ID3D11ShaderResourceView* RetriveRTShaderResourceView(size_t index);
+
+		ID3D11ShaderResourceView* RetriveDSShaderResourceView();
 
 	private:
 		int /*DXGI_FORMAT*/ rtv_fmt_;
-		int /*DXGI_FORMAT*/ dsv_fmt_;
 
 		struct RTV
 		{
@@ -44,6 +46,7 @@ namespace epsilon
 
 		ID3D11Texture2DPtr d3d_dsv_tex_;
 		ID3D11DepthStencilViewPtr d3d_dsv_;
+		ID3D11ShaderResourceViewPtr d3d_ds_srv_;
 	};
 
 }

@@ -32,15 +32,11 @@ namespace epsilon
 
 		void AddRenderable(RenderablePtr r);
 
-		void Frame();
+		void SetAmbientLight(AmbientLightPtr al);
+		void AddDirectionLight(DirectionLightPtr dl);
+		void AddSpotLight(SpotLightPtr sl);
 
-		template<class T>
-		std::shared_ptr<T> MakeObject()
-		{
-			std::shared_ptr<T> obj = std::make_shared<T>();
-			obj->SetRE(*this);
-			return obj;
-		}
+		void Frame();
 
 		IDXGISwapChain1* DXGISwapChain();
 
@@ -74,9 +70,10 @@ namespace epsilon
 		ID3D11DevicePtr d3d_device_;
 		ID3D11DeviceContextPtr d3d_imm_ctx_;
 
-		FrameBufferPtr gbuffer_pass_fb_;
-		FrameBufferPtr lighting_pass_fb_;
-		FrameBufferPtr srgb_pass_fb_;
+		FrameBufferPtr gbuffer_fb_;
+		FrameBufferPtr linear_depth_fb_;
+		FrameBufferPtr lighting_fb_;
+		FrameBufferPtr srgb_fb_;
 
 		ID3DX11EffectPtr d3d_effect_;
 
@@ -84,6 +81,10 @@ namespace epsilon
 
 		CameraPtr cam_;
 		std::vector<RenderablePtr> rs_;
+
+		AmbientLightPtr ambient_light_;
+		std::vector<DirectionLightPtr> dir_lights_;
+		std::vector<SpotLightPtr> spot_lights_;
 	};
 
 }

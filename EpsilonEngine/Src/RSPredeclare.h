@@ -22,6 +22,15 @@ namespace epsilon
 	class FrameBuffer;
 	typedef std::shared_ptr<FrameBuffer> FrameBufferPtr;
 
+	class AmbientLight;
+	typedef std::shared_ptr<AmbientLight> AmbientLightPtr;
+
+	class DirectionLight;
+	typedef std::shared_ptr<DirectionLight> DirectionLightPtr;
+
+	class SpotLight;
+	typedef std::shared_ptr<SpotLight> SpotLightPtr;
+
 }
 
 

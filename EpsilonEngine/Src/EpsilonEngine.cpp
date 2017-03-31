@@ -10,6 +10,7 @@
 #include <assimp\scene.h>
 #include "Renderable.h"
 #include "Camera.h"
+#include "Light.h"
 
 
 using namespace epsilon;
@@ -194,7 +195,8 @@ void LoadAssimpStaticMesh(RenderEngine& re, std::string file_path, float scale =
 			}
 		}
 
-		StaticMeshPtr r = re.MakeObject<StaticMesh>();
+		StaticMeshPtr r = std::make_shared<StaticMesh>();
+		r->SetRE(re);
 		r->CreateVertexBuffer(num_vert, pos_data.data(), norm_data.data(), tc_data.data());
 		r->CreateIndexBuffer(indice_data.size(), indice_data.data());
 		r->CreateMaterial(tex_path, ka, kd, ks);
@@ -220,6 +222,25 @@ int main()
 		cam->LookAt(eye, at, up);
 		cam->Perspective(XM_PI / 4, (float)width / (float)height, 0.1f, 500);
 		re.SetCamera(cam);
+
+		AmbientLightPtr al = std::make_shared<AmbientLight>();
+		al->color_ = Vector3f(0.1f, 0.1f, 0.1f);
+		re.SetAmbientLight(al);
+
+		/*DirectionLightPtr dl = std::make_shared<DirectionLight>();
+		dl->color_ = Vector3f(0.85f, 0.85f, 0.85f);
+		dl->dir_ = Vector3f(cam->eye_pos_ - cam->look_at_);
+		re.AddDirectionLight(dl);*/
+
+		SpotLightPtr sl = std::make_shared<SpotLight>();
+		sl->pos_ = Vector3f(0, 12, -4.8f);
+		sl->dir_ = Vector3f(0, 0, 1);
+		sl->color_ = Vector3f(6.0f, 5.88f, 4.38f);
+		sl->falloff_ = Vector3f(1, 0.1f, 0);
+		sl->range_ = 100;
+		sl->inner_ang_ = XM_PI / 4;
+		sl->outter_ang_ = XM_PI / 6;
+		re.AddSpotLight(sl);
 
 		LoadAssimpStaticMesh(re, "../../../Media/Model/Sponza/sponza.obj");
 

@@ -15,6 +15,8 @@ namespace epsilon
 
 		void Perspective(float ang, float aspect, float near_plane, float far_plane);
 
+		Vector3f ForwardVec();
+
 		Matrix world_;
 		Matrix view_;
 		Matrix proj_;
@@ -22,6 +24,11 @@ namespace epsilon
 		Vector3f eye_pos_;
 		Vector3f look_at_;
 		Vector3f up_;
+
+		float ang_;
+		float aspect_;
+		float near_plane_;
+		float far_plane_;
 	};
 
 }

@@ -11,7 +11,11 @@ namespace epsilon
 	FrameBuffer::FrameBuffer()
 	{
 		rtv_fmt_ = DXGI_FORMAT_R8G8B8A8_UNORM;
-		dsv_fmt_ = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	}
+
+	FrameBuffer::FrameBuffer(int rtv_fmt)
+	{
+		rtv_fmt_ = rtv_fmt;
 	}
 
 	FrameBuffer::~FrameBuffer()
@@ -60,10 +64,10 @@ namespace epsilon
 
 		//Depth stencil view
 		d3d_dsv_tex_ = MakeCOMPtr(re_->D3DCreateTexture2D(width, height,
-			dsv_fmt_, D3D11_BIND_DEPTH_STENCIL));
+			DXGI_FORMAT_R24G8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE));
 
 		d3d_dsv_ = MakeCOMPtr(re_->D3DCreateDepthStencilView(d3d_dsv_tex_.get(),
-			dsv_fmt_));
+			DXGI_FORMAT_D24_UNORM_S8_UINT));
 	}
 
 	void FrameBuffer::Destory()
@@ -98,7 +102,7 @@ namespace epsilon
 		re_->D3DContext()->OMSetRenderTargets((UINT)d3d_rtvs.size(), d3d_rtvs.data(), d3d_dsv_.get());
 	}
 
-	ID3D11ShaderResourceView* FrameBuffer::RetriveShaderResourceView(size_t index)
+	ID3D11ShaderResourceView* FrameBuffer::RetriveRTShaderResourceView(size_t index)
 	{
 		if (!rtvs_[index].d3d_srv_)
 		{
@@ -116,5 +120,22 @@ namespace epsilon
 		return rtvs_[index].d3d_srv_.get();
 	}
 
+	ID3D11ShaderResourceView* FrameBuffer::RetriveDSShaderResourceView()
+	{
+		if (!d3d_ds_srv_)
+		{
+			D3D11_SHADER_RESOURCE_VIEW_DESC d3d_srv_desc;
+			d3d_srv_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+			d3d_srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			d3d_srv_desc.Texture2D.MostDetailedMip = 0;
+			d3d_srv_desc.Texture2D.MipLevels = 1;
+
+			ID3D11ShaderResourceView* d3d_srv = nullptr;
+			THROW_FAILED(re_->D3DDevice()->CreateShaderResourceView(d3d_dsv_tex_.get(), &d3d_srv_desc, &d3d_srv));
+			d3d_ds_srv_ = MakeCOMPtr(d3d_srv);
+		}
+		
+		return d3d_ds_srv_.get();
+	}
 
 }
